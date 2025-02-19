@@ -47,12 +47,12 @@ def test_simulate_fn():
     #### Initial Drone States ####
     num_drones = 5
     init_rotor_speed = 1788.53
-    x0 = {'x': torch.zeros(num_drones,3).double(),
-          'v': torch.zeros(num_drones, 3).double(),
-          'q': torch.tensor([0, 0, 0, 1]).repeat(num_drones, 1).double(), # [i,j,k,w]
-          'w': torch.zeros(num_drones, 3).double(),
-          'wind': torch.zeros(num_drones, 3).double(),  # Since wind is handled elsewhere, this value is overwritten
-          'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed]).repeat(num_drones, 1).double()}
+    x0 = {'x': torch.zeros(num_drones,3).float(),
+          'v': torch.zeros(num_drones, 3).float(),
+          'q': torch.tensor([0, 0, 0, 1]).repeat(num_drones, 1).float(), # [i,j,k,w]
+          'w': torch.zeros(num_drones, 3).float(),
+          'wind': torch.zeros(num_drones, 3).float(),  # Since wind is handled elsewhere, this value is overwritten
+          'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed]).repeat(num_drones, 1).float()}
 
 
     #### Generate Trajectories ####
@@ -95,12 +95,12 @@ def main():
     #### Initial Drone States ####
     num_drones = 100
     init_rotor_speed = 1788.53
-    x0 = {'x': torch.zeros(num_drones,3, device=device).double(),
-          'v': torch.zeros(num_drones, 3, device=device).double(),
-          'q': torch.tensor([0, 0, 0, 1], device=device).repeat(num_drones, 1).double(), # [i,j,k,w]
-          'w': torch.zeros(num_drones, 3, device=device).double(),
-          'wind': torch.zeros(num_drones, 3, device=device).double(),  # Since wind is handled elsewhere, this value is overwritten
-          'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed], device=device).repeat(num_drones, 1).double()}
+    x0 = {'x': torch.zeros(num_drones,3, device=device).float(),
+          'v': torch.zeros(num_drones, 3, device=device).float(),
+          'q': torch.tensor([0, 0, 0, 1], device=device).repeat(num_drones, 1).float(), # [i,j,k,w]
+          'w': torch.zeros(num_drones, 3, device=device).float(),
+          'wind': torch.zeros(num_drones, 3, device=device).float(),  # Since wind is handled elsewhere, this value is overwritten
+          'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed], device=device).repeat(num_drones, 1).float()}
 
     x0_single = {'x': np.array([0, 0, 0]),
      'v': np.zeros(3, ),
@@ -129,10 +129,10 @@ def main():
         except TypeError:
             continue
 
-    kp_pos = torch.tensor([6.5, 6.5, 15]).repeat(num_drones, 1).double()
-    kd_pos = torch.tensor([4.0, 4.0, 9]).repeat(num_drones, 1).double()
-    kp_att = torch.tensor([544]).repeat(num_drones, 1).double()
-    kd_att = torch.tensor([46.64]).repeat(num_drones, 1).double()
+    kp_pos = torch.tensor([6.5, 6.5, 15]).repeat(num_drones, 1).float()
+    kd_pos = torch.tensor([4.0, 4.0, 9]).repeat(num_drones, 1).float()
+    kp_att = torch.tensor([544]).repeat(num_drones, 1).float()
+    kd_att = torch.tensor([46.64]).repeat(num_drones, 1).float()
 
     batched_trajs = BatchedMinSnap(trajectories, device=device)
     controller = SE3ControlBatch(quad_params, num_drones, device=device,
