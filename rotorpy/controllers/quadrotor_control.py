@@ -196,23 +196,23 @@ class SE3ControlBatch(object):
 
         # Gains
         if kp_pos is None:
-            self.kp_pos = torch.tensor([6.5, 6.5, 15], device=self.device).repeat(num_drones, 1).double()
+            self.kp_pos = torch.tensor([6.5, 6.5, 15], device=self.device).repeat(num_drones, 1).float()
         else:
-            self.kp_pos = kp_pos.to(self.device).double()
+            self.kp_pos = kp_pos.to(self.device).float()
         if kd_pos is None:
-            self.kd_pos = torch.tensor([4.0, 4.0, 9], device=self.device).repeat(num_drones, 1).double()
+            self.kd_pos = torch.tensor([4.0, 4.0, 9], device=self.device).repeat(num_drones, 1).float()
         else:
-            self.kd_pos = kd_pos.to(self.device).double()
+            self.kd_pos = kd_pos.to(self.device).float()
         if kp_att is None:
-            self.kp_att = torch.tensor([544], device=device).repeat(num_drones, 1).double()
+            self.kp_att = torch.tensor([544], device=device).repeat(num_drones, 1).float()
         else:
-            self.kp_att = kp_att.to(self.device).double()
+            self.kp_att = kp_att.to(self.device).float()
             if len(self.kp_att.shape) < 2:
                 self.kp_att = self.kp_att.unsqueeze(-1)
         if kd_att is None:
-            self.kd_att = torch.tensor([46.64], device=device).repeat(num_drones, 1).double()
+            self.kd_att = torch.tensor([46.64], device=device).repeat(num_drones, 1).float()
         else:
-            self.kd_att = kd_att.to(self.device).double()
+            self.kd_att = kd_att.to(self.device).float()
             if len(self.kd_att.shape) < 2:
                 self.kd_att = self.kd_att.unsqueeze(-1)
 
@@ -232,7 +232,7 @@ class SE3ControlBatch(object):
 
         self.f_to_TM = torch.from_numpy(np.vstack((np.ones((1,self.num_rotors)),
                                                    np.hstack([np.cross(self.rotor_pos[key],np.array([0,0,1])).reshape(-1,1)[0:2] for key in self.rotor_pos]),
-                                                   (k * self.rotor_dir).reshape(1,-1)))).double().to(self.device)
+                                                   (k * self.rotor_dir).reshape(1,-1)))).float().to(self.device)
         self.TM_to_f = torch.linalg.inv(self.f_to_TM)
 
     def normalize(self, x):
@@ -247,8 +247,8 @@ class SE3ControlBatch(object):
         '''
         if idxs is None:
             idxs = [i for i in range(states['x'].shape[0])]
-        pos_err = states['x'][idxs].double() - flat_outputs['x'][idxs]
-        dpos_err = states['v'][idxs].double() - flat_outputs['x_dot'][idxs]
+        pos_err = states['x'][idxs].float() - flat_outputs['x'][idxs]
+        dpos_err = states['v'][idxs].float() - flat_outputs['x_dot'][idxs]
 
         F_des = self.mass * (-self.kp_pos[idxs] * pos_err
                              - self.kd_pos[idxs] * dpos_err
@@ -257,9 +257,9 @@ class SE3ControlBatch(object):
 
 
         # R = torch.tensor(np.array([Rotation.from_quat(q).as_matrix() for q in states['q']])).float().to(self.device)
-        R = roma.unitquat_to_rotmat(states['q'][idxs]).double()
-        b3 = R @ torch.tensor([0.0, 0.0, 1.0], device=self.device).double()
-        u1 = torch.sum(F_des * b3, dim=-1).double()
+        R = roma.unitquat_to_rotmat(states['q'][idxs]).float()
+        b3 = R @ torch.tensor([0.0, 0.0, 1.0], device=self.device).float()
+        u1 = torch.sum(F_des * b3, dim=-1).float()
 
         b3_des = self.normalize(F_des)
         yaw_des = flat_outputs['yaw'][idxs]
@@ -274,10 +274,10 @@ class SE3ControlBatch(object):
         w_des = torch.stack([torch.zeros_like(yaw_des), torch.zeros_like(yaw_des), flat_outputs['yaw_dot'][idxs]], dim=-1).to(self.device)
         w_err = states['w'][idxs] - w_des
 
-        Iw = self.inertia.unsqueeze(0).double() @ states['w'][idxs].unsqueeze(-1).double()
+        Iw = self.inertia.unsqueeze(0).float() @ states['w'][idxs].unsqueeze(-1).float()
         tmp = -self.kp_att[idxs] * att_err - self.kd_att[idxs] * w_err
         # print(f"tmp shape is {tmp.shape}")
-        u2 = (self.inertia.unsqueeze(0).double() @ tmp.unsqueeze(-1)).squeeze(-1) + torch.cross(states['w'][idxs], Iw.squeeze(-1), dim=-1)
+        u2 = (self.inertia.unsqueeze(0).float() @ tmp.unsqueeze(-1)).squeeze(-1) + torch.cross(states['w'][idxs], Iw.squeeze(-1), dim=-1)
 
         TM = torch.cat([u1.unsqueeze(-1), u2], dim=-1)
         cmd_rotor_thrusts = self.TM_to_f @ TM.T
@@ -303,12 +303,12 @@ class SE3ControlBatch(object):
     def _unpack_control(cls, cmd_motor_speeds, u1, u2, cmd_q, cmd_w, cmd_v, idxs, num_drones):
         device = cmd_motor_speeds.device
         # fill state with zeros, then replace with appropriate indexes.
-        ctrl = {'cmd_motor_speeds': torch.zeros(num_drones, 4, dtype=torch.double, device=device),
-                 'cmd_thrust': torch.zeros(num_drones, 1, dtype=torch.double, device=device),
-                 'cmd_moment': torch.zeros(num_drones, 3, dtype=torch.double, device=device),
-                 'cmd_q': torch.zeros(num_drones, 4, dtype=torch.double, device=device),
-                 'cmd_w': torch.zeros(num_drones, 3, dtype=torch.double, device=device),
-                 'cmd_v': torch.zeros(num_drones, 3, dtype=torch.double, device=device)}
+        ctrl = {'cmd_motor_speeds': torch.zeros(num_drones, 4, dtype=torch.float, device=device),
+                 'cmd_thrust': torch.zeros(num_drones, 1, dtype=torch.float, device=device),
+                 'cmd_moment': torch.zeros(num_drones, 3, dtype=torch.float, device=device),
+                 'cmd_q': torch.zeros(num_drones, 4, dtype=torch.float, device=device),
+                 'cmd_w': torch.zeros(num_drones, 3, dtype=torch.float, device=device),
+                 'cmd_v': torch.zeros(num_drones, 3, dtype=torch.float, device=device)}
 
         ctrl['cmd_motor_speeds'][idxs] = cmd_motor_speeds
         ctrl['cmd_thrust'][idxs] = u1

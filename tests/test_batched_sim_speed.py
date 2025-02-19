@@ -22,12 +22,12 @@ INIT_ROTOR_SPEED = 1788.53
 
 
 def get_batch_initial_states(num_drones, device):
-    x0 = {'x': torch.zeros(num_drones,3, device=device).double(),
-          'v': torch.zeros(num_drones, 3, device=device).double(),
-          'q': torch.tensor([0, 0, 0, 1], device=device).repeat(num_drones, 1).double(), # [i,j,k,w]
-          'w': torch.zeros(num_drones, 3, device=device).double(),
-          'wind': torch.zeros(num_drones, 3, device=device).double(),  # Since wind is handled elsewhere, this value is overwritten
-          'rotor_speeds': torch.tensor([INIT_ROTOR_SPEED]*4, device=device).repeat(num_drones, 1).double()}
+    x0 = {'x': torch.zeros(num_drones,3, device=device).float(),
+          'v': torch.zeros(num_drones, 3, device=device).float(),
+          'q': torch.tensor([0, 0, 0, 1], device=device).repeat(num_drones, 1).float(), # [i,j,k,w]
+          'w': torch.zeros(num_drones, 3, device=device).float(),
+          'wind': torch.zeros(num_drones, 3, device=device).float(),  # Since wind is handled elsewhere, this value is overwritten
+          'rotor_speeds': torch.tensor([INIT_ROTOR_SPEED]*4, device=device).repeat(num_drones, 1).float()}
     return x0
 
 
