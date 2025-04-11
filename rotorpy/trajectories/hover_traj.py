@@ -62,7 +62,7 @@ class BatchedHoverTraj(object):
             assert x0.shape[0] == num_uavs, "x0 must have shape (num_uavs, 3)"
             x0 = torch.tensor(x0)
         else:
-            x0 = torch.zeros(num_uavs, 3)
+            x0 = torch.zeros(num_uavs, 3).double()
 
         self.num_uavs = num_uavs
         self.x0 = x0

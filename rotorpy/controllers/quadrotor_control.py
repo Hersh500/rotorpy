@@ -244,7 +244,7 @@ class BatchedSE3Control(object):
         b3 = R @ torch.tensor([0.0, 0.0, 1.0], device=self.device).double()
         u1 = torch.sum(F_des * b3, dim=-1).double()
 
-        b3_des = self.normalize(F_des)
+        b3_des = self.normalize(F_des).double()
         yaw_des = flat_outputs['yaw'][idxs].double()
         c1_des = torch.stack([torch.cos(yaw_des), torch.sin(yaw_des), torch.zeros_like(yaw_des)], dim=-1)
         b2_des = self.normalize(torch.cross(b3_des, c1_des, dim=-1))

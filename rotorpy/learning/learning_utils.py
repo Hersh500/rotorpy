@@ -2,9 +2,23 @@ from rotorpy.vehicles.multirotor import BatchedMultirotorParams
 from rotorpy.vehicles.crazyflie_params import quad_params as cf_params
 import numpy as np
 
+
+# randomize over 
 crazyflie_randomizations = {
-    "mass": [0.027, 0.033],
-    "k_eta": [2.1e-8, 2.5e-8],
+    "mass": [0.027, 0.032],
+    "k_eta": [1.9e-8, 2.7e-8],
+    "tau_m": [0.005, 0.005],
+    "Ixx": [1.2e-5, 1.5e-5],
+    "Iyy": [1.2e-5, 1.5e-5],
+    "Izz": [2.7e-5, 3.1e-5],
+}
+
+crazyflie_brushless_randomizations = {
+    "mass": [0.035, 0.045],
+    "k_eta": [2.9e-8, 4.1e-8],
+    "tau_m": [0.004, 0.006],
+    "k_d": [2.0e-06, 3.0e-06],
+    "k_z": [1.34e-05, 1.35e-05]
 }
 
 def generate_random_vehicle_params(num_drones,
