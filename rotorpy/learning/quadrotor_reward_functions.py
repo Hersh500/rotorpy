@@ -171,4 +171,4 @@ def vec_diff_reward_negative(observation, action, weights={'x': 1, 'v': 0.1, 'ya
 
     action_mag_reward = -weights['u_mag'] * np.linalg.norm(action - np.array([[-1, 0, 0, 0]]), axis=-1)
 
-    return dist_reward + vel_reward + action_reward + ang_rate_reward + action_mag_reward
+    return dist_reward + vel_reward + action_reward + ang_rate_reward + action_mag_reward + 5
