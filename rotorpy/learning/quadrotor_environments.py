@@ -566,16 +566,18 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
                  fig = None,                            # Figure for rendering. Optional.
                  ax = None,                             # Axis for rendering. Optional.
                  color = None,                          # The color of the quadrotor.
-                 reset_options = DEFAULT_RESET_OPTIONS
+                 reset_options = DEFAULT_RESET_OPTIONS,
+                 action_history_length = 1
                  ):
         super().__init__(num_envs, initial_states, control_mode, reward_fn, quad_params, device, max_time, wind_profile, world, sim_rate, aero, render_mode, render_fps, fig, ax, color, reset_options)
         self.trajectory = trajectory
+        self.action_history_length = action_history_length
         if self.control_mode == 'cmd_vel':
-            self.prev_action = np.zeros((self.num_envs, 3))
-            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(13+3,), dtype=np.float32)
+            self.prev_action = np.zeros((self.num_envs, action_history_length, 3))
+            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(13+3*self.action_history_length,), dtype=np.float32)
         else:
-            self.prev_action = np.zeros((self.num_envs, 4))
-            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(13+4,), dtype=np.float32)
+            self.prev_action = np.zeros((self.num_envs, action_history_length, 4))
+            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(13+4*self.action_history_length,), dtype=np.float32)
     
     def reset_idx(self, env_idx, options):
         super().reset_idx(env_idx, options)
@@ -584,8 +586,9 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
     def step(self, action):
         obs, reward, done, info = super().step(action)
 
-        # update previous action to current action 
-        self.prev_action = action
+        # update previous action to current action
+        self.prev_action[:, 1:] = self.prev_action[:, :-1]
+        self.prev_action[:,0] = action
 
         return self._get_obs(), reward, done, info
 
@@ -595,7 +598,8 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
                                self.vehicle_states['v'] - flat_output['x_dot'],
                                self.vehicle_states['q'],
                                self.vehicle_states['w']], dim=-1)
-        return np.hstack([state_vec.float().cpu().numpy(), self.prev_action])
+        prev_action_flattened = self.prev_action.reshape(self.num_envs, -1)
+        return np.hstack([state_vec.float().cpu().numpy(), prev_action_flattened])
 
 
 def make_default_vec_env(num_envs, quad_params, control_mode, device, **kwargs):

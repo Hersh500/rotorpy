@@ -33,7 +33,7 @@ from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback,
 
 device = torch.device("cpu")
 
-num_envs = 1024
+num_envs = 512
 init_rotor_speed = 1788.53
 
 reward_weights = {'x': 1.0, 'v': 0.2, 'yaw': 0.0, 'w': 1e-3, 'u': 1e-3, 'u_mag': 0e-4, 'survive': 3}
@@ -54,7 +54,7 @@ randomizations["mass"] = [0.026, 0.034]
 # randomizations["Izz"] = [2.0e-5, 3.1e-5]
 randomizations["kp_att"] = [1000, 1200]
 randomizations["kd_att"] = [40, 60]
-randomizations["tau_m"] = [0.05, 0.05]
+# randomizations["tau_m"] = [0.05, 0.05]
 
 reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
 reset_options["params"] = "random"
@@ -75,7 +75,8 @@ env = QuadrotorDiffTrackingEnv(num_envs,
                               device=device,
                               render_mode="None",
                               reward_fn=reward_fn,
-                              reset_options=reset_options)
+                              reset_options=reset_options,
+                               action_history_length=3)
 
 
 # Allows Stable Baselines to report accurate reward and episode lengths
@@ -109,7 +110,8 @@ eval_env = QuadrotorDiffTrackingEnv(num_eval_envs,
                               device=device,
                               render_mode="3D",
                               reward_fn=reward_fn,
-                              reset_options=eval_reset_options)
+                              reset_options=eval_reset_options,
+                                    action_history_length=3)
 
 wrapped_eval_env = VecMonitor(eval_env)
 
@@ -120,7 +122,7 @@ checkpoint_callback = CheckpointCallback(save_freq=max(50000//num_envs, 1), save
 eval_callback = EvalCallback(wrapped_eval_env, eval_freq=1e6//num_envs, deterministic=True, render=True)
 model = PPO(MlpPolicy,
             wrapped_env,
-            n_steps=16,
+            n_steps=32,
             batch_size=1024,
             verbose=1,
             device=device,

@@ -24,10 +24,10 @@ from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback,
 from rotorpy.vehicles.multirotor import BatchedMultirotorParams
 
 model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "learning", "policies", "PPO",
-                         "traj_cmd_ctattApr-28-23-30")
+                         "traj_cmd_ctattApr-29-13-41")
 
 # model_file = "hover_9982464_steps"
-model_file = "hover_14991360_steps"
+model_file = "hover_14998528_steps"
 # Load ppo policy
 model = PPO.load(os.path.join(model_dir, model_file))
 
@@ -50,14 +50,14 @@ x0 = {'x': torch.rand(num_envs,3, device=device).double() * 4 - 2,
 
 reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
 reset_options["params"] = "random"
-reset_options["initial_state"] = x0
+reset_options["initial_states"] = x0
 reset_options["pos_bound"] = 0.5
 reset_options["vel_bound"] = 0.2
 reset_options["trajectory"] = "fixed"
 control_mode = "cmd_ctatt"
 params = BatchedMultirotorParams([quad_params] * num_envs, num_envs, device)
 
-quad_params["tau_m"] = 0.05
+# quad_params["tau_m"] = 0.05
 env_for_policy = QuadrotorDiffTrackingEnv(num_envs, 
                               initial_states=x0, 
                               trajectory=trajectory,
@@ -67,7 +67,8 @@ env_for_policy = QuadrotorDiffTrackingEnv(num_envs,
                               device=device,
                               render_mode="3D",
                               reward_fn=reward_fn,
-                              reset_options=reset_options)
+                              reset_options=reset_options,
+                                          action_history_length=3)
 
 env_for_ctrlr = QuadrotorDiffTrackingEnv(num_envs, 
                               initial_states=x0, 
@@ -78,7 +79,8 @@ env_for_ctrlr = QuadrotorDiffTrackingEnv(num_envs,
                               device=device,
                               render_mode="None",
                               reward_fn=reward_fn,
-                              reset_options=reset_options)
+                              reset_options=reset_options,
+                                         action_history_length=3)
 
 policy_obs = env_for_policy.reset()
 ctrlr_obs = env_for_ctrlr.reset()
@@ -113,7 +115,7 @@ while t < 500:
     ctrlr_actions[t] = np.hstack([control_dict["cmd_thrust"].numpy(), eulers])
 
     # Now do the policy
-    policy_action = model.predict(policy_obs, deterministic=False)[0]
+    policy_action = model.predict(policy_obs, deterministic=True)[0]
     policy_control_dict = env_for_policy.rescale_action(policy_action)
     policy_eulers = R.from_quat(policy_control_dict["cmd_q"]).as_euler('xyz')
 
