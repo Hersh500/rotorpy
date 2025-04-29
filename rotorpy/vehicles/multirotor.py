@@ -677,6 +677,19 @@ class BatchedMultirotorParams:
             geom_hat_maps.append(BatchedMultirotor.hat_map(torch.from_numpy(rotor_geometry.squeeze())).numpy())
         self.rotor_geometry = torch.from_numpy(np.array(geoms)).to(self.device)
         self.rotor_geometry_hat_maps = torch.from_numpy(np.array(geom_hat_maps)).to(self.device)
+    
+    def update_low_level_gains(self, idx, k_w=None, k_v=None, kp_att=None, kd_att=None):
+        """
+        Update the low-level control gains of the drone at index idx. Parameters with value None are not updated.
+        """
+        if k_w is not None:
+            self.k_w[idx] = k_w
+        if k_v is not None:
+            self.k_v[idx] = k_v
+        if kp_att is not None:
+            self.kp_att[idx] = kp_att
+        if kd_att is not None:
+            self.kd_att[idx] = kd_att
 
 
 class BatchedMultirotor(object):

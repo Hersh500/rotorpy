@@ -142,3 +142,6 @@ waypoint_traj.py
 
 # DS_Store
 *.DS_Store
+
+# Ignore policies
+sim2real_rl/learning/*

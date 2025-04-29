@@ -79,5 +79,11 @@ def update_vehicle_params(idx,
     if "motor_noise" in ranges:
         motor_noise = np.random.uniform(ranges["motor_noise"][0], ranges["motor_noise"][1])
         params_obj.motor_noise[idx] = motor_noise
+    if "k_v" in ranges or "k_w" in ranges or "kp_att" in ranges or "kd_att" in ranges:
+        k_v = np.random.uniform(ranges["k_v"][0], ranges["k_v"][1]) if "k_v" in ranges else None
+        k_w = np.random.uniform(ranges["k_w"][0], ranges["k_w"][1]) if "k_w" in ranges else None
+        kp_att = np.random.uniform(ranges["kp_att"][0], ranges["kp_att"][1]) if "kp_att" in ranges else None
+        kd_att = np.random.uniform(ranges["kd_att"][0], ranges["kd_att"][1]) if "kd_att" in ranges else None
+        params_obj.update_low_level_gains(idx, k_v, k_w, kp_att, kd_att)
 
     return 

@@ -148,7 +148,7 @@ def vec_diff_reward(observation, action, weights={'x': 1, 'v': 0.1, 'yaw': 0.0, 
     return dist_reward + vel_reward + action_reward + ang_rate_reward + action_mag_reward
 
 
-def vec_diff_reward_negative(observation, action, weights={'x': 1, 'v': 0.1, 'yaw': 0.0, 'w': 1e-1, 'u': 1e-2, 'u_mag': 1e-2}):
+def vec_diff_reward_negative(observation, action, weights={'x': 1, 'v': 0.1, 'yaw': 0.0, 'w': 1e-1, 'u': 1e-2, 'u_mag': 1e-2, 'survive':5}):
     """
     Rewards low position error, low velocity error. 
     It is a combination of position error, velocity error, body rates, and
@@ -167,8 +167,8 @@ def vec_diff_reward_negative(observation, action, weights={'x': 1, 'v': 0.1, 'ya
     ang_rate_reward = -weights['w']*np.linalg.norm(observation[...,10:13], axis=-1)
 
     # Compute the action reward
-    action_reward = -weights['u']*np.linalg.norm(action - observation[...,13:], axis=-1)
+    action_reward = -weights['u']*(np.linalg.norm(action - observation[...,13:], axis=-1))**2
 
     action_mag_reward = -weights['u_mag'] * np.linalg.norm(action - np.array([[-1, 0, 0, 0]]), axis=-1)
 
-    return dist_reward + vel_reward + action_reward + ang_rate_reward + action_mag_reward + 5
+    return dist_reward + vel_reward + action_reward + ang_rate_reward + action_mag_reward + weights['survive'] 

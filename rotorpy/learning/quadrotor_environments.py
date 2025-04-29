@@ -547,6 +547,57 @@ class QuadrotorEnv(VecEnv):
         self.async_action = None
         return results
 
+class QuadrotorDiffTrackingEnv(QuadrotorEnv):
+    def __init__(self,
+                 num_envs,                              # Number of quadrotor environments to spawn.
+                 initial_states,                        # The initial states of the drones.
+                 trajectory,                            # A BatchedTrajectory object to track
+                 control_mode = 'cmd_vel',              # Control abstraction, see metadata["control_modes"] for a list.
+                 reward_fn = vec_hover_reward,          # Reward function, must output the same dim as the number of drones. 
+                 quad_params = crazyflie_params,        # Vehicle params for the quadrotor environment. Can be BatchedMultirotorParams. 
+                 device = torch.device('cpu'),          # Device to load environment onto. 
+                 max_time = 10,                         # Maximum time to run the simulation for in a single session.
+                 wind_profile = None,                   # wind profile object, if none is supplied it will choose no wind.
+                 world        = None,                   # The world object
+                 sim_rate = 100,                        # The update frequency of the simulator in Hz
+                 aero = True,                           # Whether or not aerodynamic wrenches are computed.
+                 render_mode = "None",                  # The rendering mode
+                 render_fps = 30,                       # The rendering frames per second. Lower this for faster visualization.
+                 fig = None,                            # Figure for rendering. Optional.
+                 ax = None,                             # Axis for rendering. Optional.
+                 color = None,                          # The color of the quadrotor.
+                 reset_options = DEFAULT_RESET_OPTIONS
+                 ):
+        super().__init__(num_envs, initial_states, control_mode, reward_fn, quad_params, device, max_time, wind_profile, world, sim_rate, aero, render_mode, render_fps, fig, ax, color, reset_options)
+        self.trajectory = trajectory
+        if self.control_mode == 'cmd_vel':
+            self.prev_action = np.zeros((self.num_envs, 3))
+            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(13+3,), dtype=np.float32)
+        else:
+            self.prev_action = np.zeros((self.num_envs, 4))
+            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(13+4,), dtype=np.float32)
+    
+    def reset_idx(self, env_idx, options):
+        super().reset_idx(env_idx, options)
+        self.prev_action[env_idx] = 0
+    
+    def step(self, action):
+        obs, reward, done, info = super().step(action)
+
+        # update previous action to current action 
+        self.prev_action = action
+
+        return self._get_obs(), reward, done, info
+
+    def _get_obs(self):
+        flat_output = self.trajectory.update(self.t)
+        state_vec = torch.cat([self.vehicle_states['x'] - flat_output['x'],
+                               self.vehicle_states['v'] - flat_output['x_dot'],
+                               self.vehicle_states['q'],
+                               self.vehicle_states['w']], dim=-1)
+        return np.hstack([state_vec.float().cpu().numpy(), self.prev_action])
+
+
 def make_default_vec_env(num_envs, quad_params, control_mode, device, **kwargs):
     num_drones = num_envs
     init_rotor_speed = 1788.53
