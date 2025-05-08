@@ -441,7 +441,7 @@ class QuadrotorEnv(VecEnv):
         elif self.control_mode == "cmd_ctatt":
             cmd_thrust = _minmax_scale(action[...,0].reshape(-1, 1), self.quad_params.num_rotors * self.min_thrust, self.quad_params.num_rotors * self.max_thrust)
             control_dict["cmd_thrust"] = cmd_thrust
-            control_dict["cmd_q"] = Rotation.from_euler("xyz", _minmax_scale(action[...,1:4].reshape(-1, 3), -np.pi, np.pi)).as_quat()
+            control_dict["cmd_q"] = Rotation.from_euler("xyz", _minmax_scale(action[...,1:4].reshape(-1, 3), -np.pi/3, np.pi/3)).as_quat()
         return control_dict
 
     def _get_reward(self, observation, action):

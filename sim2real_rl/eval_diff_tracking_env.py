@@ -6,7 +6,8 @@ import roma
 from scipy.spatial.transform import Rotation as R
 
 import rotorpy
-from rotorpy.vehicles.crazyflie_params import quad_params  # Import quad params for the quadrotor environment.
+#from rotorpy.vehicles.crazyflie_params import quad_params  # Import quad params for the quadrotor environment.
+from rotorpy.vehicles.crazyfliebrushless_params import quad_params  # Import quad params for the quadrotor environment.
 
 # Import the QuadrotorEnv gymnasium environment using the following command.
 from rotorpy.learning.quadrotor_environments import QuadrotorDiffTrackingEnv
@@ -24,10 +25,9 @@ from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback,
 from rotorpy.vehicles.multirotor import BatchedMultirotorParams
 
 model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "learning", "policies", "PPO",
-                         "traj_cmd_ctattApr-29-13-41")
+                         "traj_cmd_ctattMay-07-23-32")
 
-# model_file = "hover_9982464_steps"
-model_file = "hover_14998528_steps"
+model_file = "hover_3973120_steps"
 # Load ppo policy
 model = PPO.load(os.path.join(model_dir, model_file))
 
@@ -117,6 +117,7 @@ while t < 500:
     # Now do the policy
     policy_action = model.predict(policy_obs, deterministic=True)[0]
     policy_control_dict = env_for_policy.rescale_action(policy_action)
+    # policy_eulers = R.from_quat(policy_control_dict["cmd_q"] * np.sign(policy_control_dict["cmd_q"][:,-1].reshape(-1, 1))).as_euler('xyz')
     policy_eulers = R.from_quat(policy_control_dict["cmd_q"]).as_euler('xyz')
 
     policy_obs, policy_rwd, policy_done, _ = env_for_policy.step(policy_action)

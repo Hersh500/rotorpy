@@ -1,6 +1,7 @@
 import numpy as np
-from scipy.spatial.transform import Rotation
+from scipy.spatial.transform import Rotation as R
 import torch
+import roma
 
 import gymnasium as gym
 from gymnasium import spaces
@@ -166,9 +167,31 @@ def vec_diff_reward_negative(observation, action, weights={'x': 1, 'v': 0.1, 'ya
     # Compute the angular rate reward
     ang_rate_reward = -weights['w']*np.linalg.norm(observation[...,10:13], axis=-1)
 
+    # rewards maintaining zero yaw.
+    q = observation[...,6:10]
+    yaw = R.from_quat(q).as_euler('xyz')[...,2]
+    yaw_reward = -weights['yaw'] * np.abs(yaw)
+
     # Compute the action reward
-    action_reward = -weights['u']*(np.linalg.norm(action - observation[...,13:13+action.shape[-1]], axis=-1))**2
+    if isinstance(weights['u'], float):
+        action_reward = -weights['u']*(np.linalg.norm(action - observation[...,13:13+action.shape[-1]], axis=-1)**2)
+    else:
+        action_reward = np.dot(np.abs(action - observation[...,13:13+action.shape[-1]])**2, -weights['u'])
 
-    action_mag_reward = -weights['u_mag'] * np.linalg.norm(action - np.array([[-1, 0, 0, 0]]), axis=-1)
+    # Mean-based reward
+    # if isinstance(weights['u'], float):
+    #     action_history = observation[...,13:].reshape(action.shape[0], -1, action.shape[-1])
+    #     mean_action = np.mean(action_history, axis=1)
+    #     action_reward = -weights['u']*(np.linalg.norm(action - mean_action, axis=-1))**2
+    # else:
+    #     # Multiply the weight by the action difference per action-term
+    #     action_history = observation[...,13:].reshape(action.shape[0], -1, action.shape[-1])
+    #     mean_action = np.mean(action_history, axis=1)
+    #     action_reward = np.dot((action - mean_action)**2, -weights['u'])
 
-    return dist_reward + vel_reward + action_reward + ang_rate_reward + action_mag_reward + weights['survive'] 
+    if isinstance(weights['u_mag'], float):
+        action_mag_reward = -weights['u_mag'] * np.linalg.norm(action, axis=-1)
+    else:
+        action_mag_reward = np.dot(np.abs(action), -weights['u_mag'])
+
+    return dist_reward + vel_reward + action_reward + ang_rate_reward + yaw_reward + action_mag_reward + weights['survive'] 
