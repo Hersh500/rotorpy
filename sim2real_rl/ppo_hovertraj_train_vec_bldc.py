@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 
 import rotorpy
-from rotorpy.vehicles.crazyflie_params import quad_params  # Import quad params for the quadrotor environment.
+from rotorpy.vehicles.crazyfliebrushless_params import quad_params  # Import quad params for the quadrotor environment.
 
 # Import the QuadrotorEnv gymnasium environment using the following command.
 from rotorpy.learning.quadrotor_environments import QuadrotorDiffTrackingEnv
@@ -60,14 +60,12 @@ x0 = {'x': torch.zeros(num_envs,3, device=device).double(),
         'wind': torch.zeros(num_envs, 3, device=device).double(),
         'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed], device=device).repeat(num_envs, 1).double()}
 
-randomizations = dict(crazyflie_randomizations)
-randomizations["mass"] = [0.026, 0.034]
-randomizations["tau_m"] = [0.004, 0.006]
-randomizations["kp_att"] = [1000, 1500]
-randomizations["kd_att"] = [40, 60]
+randomizations = dict(crazyflie_brushless_randomizations)
+randomizations["kp_att"] = [3000, 3500]
+randomizations["kd_att"] = [310, 410]
 
 reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
-reset_options["params"] = "random"
+reset_options["params"] = "fixed"
 reset_options["randomization_ranges"] = randomizations
 reset_options["pos_bound"] = 2.0 
 reset_options["vel_bound"] = 0.5
@@ -106,7 +104,7 @@ x0_eval = {'x': torch.zeros(num_eval_envs,3, device=device).double(),
 
 eval_reset_options = dict(reset_options)
 eval_reset_options["trajectory"] = "fixed"
-eval_reset_options["params"] = "random"
+eval_reset_options["params"] = "fixed"
 eval_reset_options["initial_state"] = "random"
 eval_reset_options["pos_bound"] = 2.0
 eval_reset_options["vel_bound"] = 0.2
@@ -126,7 +124,7 @@ eval_env = QuadrotorDiffTrackingEnv(num_eval_envs,
 wrapped_eval_env = VecMonitor(eval_env)
 
 start_time = datetime.now()
-checkpoint_callback = CheckpointCallback(save_freq=max(50000//num_envs, 1), save_path=f"{models_dir}/PPO/hover_cmd_ctatt{start_time.strftime('%b-%d-%H-%M')}/",
+checkpoint_callback = CheckpointCallback(save_freq=max(50000//num_envs, 1), save_path=f"{models_dir}/PPO/hover_cmd_ctatt_bldc{start_time.strftime('%b-%d-%H-%M')}/",
                                          name_prefix='hover')
 
 eval_callback = EvalCallback(wrapped_eval_env, eval_freq=1e6//num_envs, deterministic=True, render=True)
@@ -139,9 +137,9 @@ model = PPO(MlpPolicy,
             tensorboard_log=log_dir,
             policy_kwargs=dict(optimizer_kwargs=dict(weight_decay=0.00001)))
 
-num_timesteps = 4e6
+num_timesteps = 7e6
 model.learn(total_timesteps=num_timesteps, reset_num_timesteps=False,
-            tb_log_name="PPO-QuadHoverTrajVec_"+control_mode + " " + start_time.strftime('%b-%d-%H-%M'),
+            tb_log_name="PPO-QuadBLDCHoverTrajVec_"+control_mode + " " + start_time.strftime('%b-%d-%H-%M'),
             callback=CallbackList([checkpoint_callback, eval_callback]))
 
 print(f"DOING FINAL EVALUATION...")
