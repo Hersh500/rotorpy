@@ -22,7 +22,8 @@ from copy import deepcopy
 
 DEFAULT_RESET_OPTIONS = {'initial_states': 'random', 'pos_bound': 2, 'vel_bound': 0,
                          "params": "fixed", 
-                         "randomization_ranges": crazyflie_randomizations}
+                         "randomization_ranges": crazyflie_randomizations,
+                         "traj_randomization_fn": None}
 
 def _minmax_scale(x, min_values, max_values):
     '''
@@ -247,6 +248,10 @@ class QuadrotorEnv(VecEnv):
             self.max_roll_moment[env_idx] = self.max_thrust[env_idx] * np.abs(self.quad_params.rotor_pos[env_idx]['r1'][1])
             self.max_pitch_moment[env_idx] = self.max_thrust[env_idx] * np.abs(self.quad_params.rotor_pos[env_idx]['r1'][0])
             self.max_yaw_moment = self.quad_params.k_m[env_idx].cpu().numpy() * self.rotor_speed_max**2
+        if options["traj_randomization_fn"] is not None:
+            # If a trajectory randomization function is provided, call it to randomize the trajectory.
+            # Modifies the trajectory in place.
+            options["traj_randomization_fn"](self.trajectory, env_idx)
 
         if env_idx < min(self.num_envs, 5) and self.render_mode[0] == "debug":
             if self.counts[env_idx] % 10 == 0 and self.counts[env_idx] != 0:
@@ -582,6 +587,10 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
     def reset_idx(self, env_idx, options):
         super().reset_idx(env_idx, options)
         self.prev_action[env_idx] = 0
+        if options["traj_randomization_fn"] is not None:
+            # If a trajectory randomization function is provided, call it to randomize the trajectory.
+            # Modifies the trajectory in place.
+            options["traj_randomization_fn"](self.trajectory, env_idx)
     
     def step(self, action):
         obs, reward, done, info = super().step(action)
@@ -593,14 +602,14 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
         return self._get_obs(), reward, done, info
 
     def _get_obs(self):
-        flat_output = self.trajectory.update(self.t)
+        flat_output = self.trajectory.update(torch.from_numpy(self.t))
         state_vec = torch.cat([self.vehicle_states['x'] - flat_output['x'],
                                self.vehicle_states['v'] - flat_output['x_dot'],
                                self.vehicle_states['q'],
                                self.vehicle_states['w']], dim=-1)
         prev_action_flattened = self.prev_action.reshape(self.num_envs, -1)
         return np.hstack([state_vec.float().cpu().numpy(), prev_action_flattened])
-
+    
 
 def make_default_vec_env(num_envs, quad_params, control_mode, device, **kwargs):
     num_drones = num_envs

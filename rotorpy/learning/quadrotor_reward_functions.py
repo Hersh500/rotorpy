@@ -173,21 +173,21 @@ def vec_diff_reward_negative(observation, action, weights={'x': 1, 'v': 0.1, 'ya
     yaw_reward = -weights['yaw'] * np.abs(yaw)
 
     # Compute the action reward
-    if isinstance(weights['u'], float):
-        action_reward = -weights['u']*(np.linalg.norm(action - observation[...,13:13+action.shape[-1]], axis=-1)**2)
-    else:
-        action_reward = np.dot(np.abs(action - observation[...,13:13+action.shape[-1]])**2, -weights['u'])
+    # if isinstance(weights['u'], float):
+    #     action_reward = -weights['u']*(np.linalg.norm(action - observation[...,13:13+action.shape[-1]], axis=-1)**2)
+    # else:
+    #     action_reward = np.dot(np.abs(action - observation[...,13:13+action.shape[-1]])**2, -weights['u'])
 
     # Mean-based reward
-    # if isinstance(weights['u'], float):
-    #     action_history = observation[...,13:].reshape(action.shape[0], -1, action.shape[-1])
-    #     mean_action = np.mean(action_history, axis=1)
-    #     action_reward = -weights['u']*(np.linalg.norm(action - mean_action, axis=-1))**2
-    # else:
-    #     # Multiply the weight by the action difference per action-term
-    #     action_history = observation[...,13:].reshape(action.shape[0], -1, action.shape[-1])
-    #     mean_action = np.mean(action_history, axis=1)
-    #     action_reward = np.dot((action - mean_action)**2, -weights['u'])
+    if isinstance(weights['u'], float):
+        action_history = observation[...,13:].reshape(action.shape[0], -1, action.shape[-1])
+        mean_action = np.mean(action_history, axis=1)
+        action_reward = -weights['u']*(np.linalg.norm(action - mean_action, axis=-1))**2
+    else:
+        # Multiply the weight by the action difference per action-term
+        action_history = observation[...,13:].reshape(action.shape[0], -1, action.shape[-1])
+        mean_action = np.mean(action_history, axis=1)
+        action_reward = np.dot((action - mean_action)**2, -weights['u'])
 
     if isinstance(weights['u_mag'], float):
         action_mag_reward = -weights['u_mag'] * np.linalg.norm(action, axis=-1)

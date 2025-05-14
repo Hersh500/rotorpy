@@ -15,10 +15,8 @@ crazyflie_randomizations = {
 
 crazyflie_brushless_randomizations = {
     "mass": [0.035, 0.045],
-    "k_eta": [2.9e-8, 4.1e-8],
+    "k_eta": [3.0e-8, 4.0e-8],
     "tau_m": [0.004, 0.006],
-    "k_d": [2.0e-06, 3.0e-06],
-    "k_z": [1.34e-05, 1.35e-05]
 }
 
 def generate_random_vehicle_params(num_drones,

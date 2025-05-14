@@ -45,8 +45,8 @@ reward_weights = {'x': 1.0,
                   'v': 0.1, 
                   'yaw': 0.1, 
                   'w': 2e-3, 
-                  'u': np.array([5e-3, 5e-3, 5e-3, 5e-3]), 
-                  'u_mag': np.array([0e-4, 2e-4, 2e-4, 2e-4]), 
+                  'u': np.array([3e-3, 3e-3, 3e-3, 3e-3]), 
+                  'u_mag': np.array([2e-4, 3e-4, 3e-4, 3e-4]), 
                   'survive': 3}
 
 
@@ -67,7 +67,7 @@ randomizations["kp_att"] = [1000, 1500]
 randomizations["kd_att"] = [40, 60]
 
 reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
-reset_options["params"] = "random"
+reset_options["params"] = "fixed"
 reset_options["randomization_ranges"] = randomizations
 reset_options["pos_bound"] = 2.0 
 reset_options["vel_bound"] = 0.5
@@ -106,7 +106,7 @@ x0_eval = {'x': torch.zeros(num_eval_envs,3, device=device).double(),
 
 eval_reset_options = dict(reset_options)
 eval_reset_options["trajectory"] = "fixed"
-eval_reset_options["params"] = "fixed"
+eval_reset_options["params"] = "random"
 eval_reset_options["initial_state"] = "random"
 eval_reset_options["pos_bound"] = 2.0
 eval_reset_options["vel_bound"] = 0.2
@@ -126,7 +126,7 @@ eval_env = QuadrotorDiffTrackingEnv(num_eval_envs,
 wrapped_eval_env = VecMonitor(eval_env)
 
 start_time = datetime.now()
-checkpoint_callback = CheckpointCallback(save_freq=max(50000//num_envs, 1), save_path=f"{models_dir}/PPO/traj_cmd_ctatt{start_time.strftime('%b-%d-%H-%M')}/",
+checkpoint_callback = CheckpointCallback(save_freq=max(50000//num_envs, 1), save_path=f"{models_dir}/PPO/hover_cmd_ctatt{start_time.strftime('%b-%d-%H-%M')}/",
                                          name_prefix='hover')
 
 eval_callback = EvalCallback(wrapped_eval_env, eval_freq=1e6//num_envs, deterministic=True, render=True)

@@ -6,8 +6,8 @@ import roma
 from scipy.spatial.transform import Rotation as R
 
 import rotorpy
-#from rotorpy.vehicles.crazyflie_params import quad_params  # Import quad params for the quadrotor environment.
-from rotorpy.vehicles.crazyfliebrushless_params import quad_params  # Import quad params for the quadrotor environment.
+from rotorpy.vehicles.crazyflie_params import quad_params  # Import quad params for the quadrotor environment.
+# from rotorpy.vehicles.crazyfliebrushless_params import quad_params  # Import quad params for the quadrotor environment.
 
 # Import the QuadrotorEnv gymnasium environment using the following command.
 from rotorpy.learning.quadrotor_environments import QuadrotorDiffTrackingEnv
@@ -24,8 +24,11 @@ from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback,
 
 from rotorpy.vehicles.multirotor import BatchedMultirotorParams
 
+# model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "learning", "policies", "PPO",
+#                          "hover_cmd_ctattMay-12-23-57")
+
 model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "learning", "policies", "PPO",
-                         "traj_cmd_ctattMay-07-23-32")
+                         "hover_cmd_ctattMay-12-23-43")
 
 model_file = "hover_3973120_steps"
 # Load ppo policy
