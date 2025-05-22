@@ -729,7 +729,7 @@ class BatchedMultirotor(object):
 
         self.aero = aero
 
-        assert integrator == 'dopri5' or integrator == "rk4"
+        # assert integrator == 'dopri5' or integrator == "rk4"
         self.integrator = integrator
 
     def statedot(self, state, control, t_step, idxs):
@@ -905,10 +905,10 @@ class BatchedMultirotor(object):
             lift[:, 2, :] = self.params.k_h[idxs]
             lift = torch.bmm(lift, (local_airspeeds[:, 0, :] ** 2 + local_airspeeds[:, 1, :] ** 2).unsqueeze(1))
             T += lift
-        else:
-            D = torch.zeros(num_drones, 3, device=self.device)
-            H = torch.zeros((num_drones, 3, self.params.num_rotors), device=self.device)
-            M_flap = torch.zeros((num_drones, 3, self.params.num_rotors), device=self.device)
+        else:  # FOUND BUG HERE! NEEDS TO BE DOUBLES!
+            D = torch.zeros(num_drones, 3, device=self.device).double()
+            H = torch.zeros((num_drones, 3, self.params.num_rotors), device=self.device).double()
+            M_flap = torch.zeros((num_drones, 3, self.params.num_rotors), device=self.device).double()
 
         # Compute the moments due to the rotor thrusts, rotor drag (if applicable), and rotor drag torques
         M_force = -torch.einsum('bijk, bik->bj', self.params.rotor_geometry_hat_maps[idxs], T + H)
