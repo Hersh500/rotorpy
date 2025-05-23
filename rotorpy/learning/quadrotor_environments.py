@@ -1,12 +1,13 @@
 import numpy as np
 import torch
+from torch.nn import Module
 from scipy.spatial.transform import Rotation
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import warnings
 
 from rotorpy.world import World
-from rotorpy.vehicles.multirotor import BatchedMultirotorParams, BatchedMultirotor
+from rotorpy.vehicles.multirotor import BatchedMultirotorParams, BatchedMultirotor, JITMultirotor
 from rotorpy.vehicles.crazyflie_params import quad_params as crazyflie_params
 from rotorpy.learning.quadrotor_reward_functions import vec_hover_reward, vec_hover_reward_positive
 from rotorpy.utils.shapes import Quadrotor
@@ -34,6 +35,24 @@ def _minmax_scale(x, min_values, max_values):
     '''
     x_scaled = np.clip((x+1)/2 * (max_values - min_values) + min_values, min_values, max_values)
     return x_scaled
+
+class BatchedMultirotorModule(Module):
+    """
+    A PyTorch module that represents a batched multirotor vehicle.
+    """
+
+    def __init__(self, multirotor_obj: JITMultirotor, control_keys: list, control_idxs: list):
+        super(BatchedMultirotorModule, self).__init__()
+        self.multirotor_obj = multirotor_obj
+        self.control_keys = control_keys
+        self.control_idxs = control_idxs
+
+    def forward(self, state: torch.Tensor, control: torch.Tensor, t_step: torch.Tensor,
+                *dynamics_args) -> torch.Tensor:
+        control_dict = {key: control[:,idx] for key, idx in zip(self.control_keys, self.control_idxs)}
+        state_dict = BatchedMultirotor._unpack_state(state, np.arange(state.shape[0], dtype=int), state.shape[0]) 
+        out_dict = self.multirotor_obj.step(state_dict, control_dict, t_step.item(), None, *dynamics_args)
+        return JITMultirotor._pack_state(out_dict, state.shape[0], torch.device("cpu"))
 
 class QuadrotorEnv(VecEnv):
     """
@@ -88,7 +107,8 @@ class QuadrotorEnv(VecEnv):
                  fig = None,                            # Figure for rendering. Optional.
                  ax = None,                             # Axis for rendering. Optional.
                  color = None,                          # The color of the quadrotor.
-                 reset_options = DEFAULT_RESET_OPTIONS
+                 reset_options = DEFAULT_RESET_OPTIONS,
+                 trace_dynamics = True
                  ):
 
         self.num_envs = num_envs
@@ -125,13 +145,6 @@ class QuadrotorEnv(VecEnv):
         self.reward_fn = reward_fn
         self.metadata["render_fps"] = render_fps
 
-        self.quadrotors = BatchedMultirotor(batched_params=self.quad_params,
-                                           num_drones = self.num_envs,
-                                           initial_states=initial_states,
-                                           device=self.device,
-                                           control_abstraction=control_mode,
-                                           aero=aero,
-                                           integrator="rk4")
         self.t = np.zeros(self.num_envs)
         self.max_time = max_time
 
@@ -206,8 +219,53 @@ class QuadrotorEnv(VecEnv):
         self.counts = np.zeros(min(self.num_envs, 5))
         self.cum_rewards = np.zeros(self.num_envs)
 
+        if control_mode == "cmd_ctatt":
+            control_keys = ['cmd_thrust', 'cmd_q']
+            control_idxs = [[0], [1, 2, 3, 4]]
+            num_ctrls = 5
+        else:
+            raise NotImplementedError
+        self.trace_dynamics = trace_dynamics
+        if self.trace_dynamics:
+            self.quadrotors = JITMultirotor(num_drones = self.num_envs,
+                                            initial_states=initial_states,
+                                            device=self.device,
+                                            control_abstraction=control_mode,
+                                            aero=aero,
+                                            integrator="rk4")
+            self.dynamics_module = BatchedMultirotorModule(self.quadrotors, control_keys, control_idxs)
+            example_control_input = torch.zeros(self.num_envs, num_ctrls, device=self.device).float()
+            example_init_state = {'x': torch.zeros(self.num_envs,3, device=self.device).double(),
+                'v': torch.zeros(self.num_envs, 3, device=self.device).double(),
+                'q': torch.tensor([0, 0, 0, 1], device=self.device).repeat(self.num_envs, 1).double(),
+                'w': torch.zeros(self.num_envs, 3, device=self.device).double(),
+                'wind': torch.zeros(self.num_envs, 3, device=self.device).double(),
+                'rotor_speeds': torch.tensor([1788, 1788, 1788, 1788], device=self.device).repeat(self.num_envs, 1).double()}
+            
+            self.pack_dynamics_args()
+            self.traced_step = torch.jit.trace(self.dynamics_module, example_inputs = (JITMultirotor._pack_state(example_init_state, self.num_envs, torch.device("cpu")), example_control_input, torch.Tensor([self.t_step]).float(), *self.dynamics_args))
+        else:
+            self.quadrotors = BatchedMultirotor(batched_params=self.quad_params,
+                                            num_drones = self.num_envs,
+                                            initial_states=initial_states,
+                                            device=self.device,
+                                            control_abstraction=control_mode,
+                                            aero=aero,
+                                            integrator="rk4")
+
     def close(self):
         pass
+    
+
+    def pack_dynamics_args(self):
+        self.dynamics_args = (self.quad_params.rotor_speed_min, self.quad_params.rotor_speed_max, torch.tensor([self.quad_params.num_rotors]), 
+                        self.quad_params.motor_noise, self.quad_params.mass, self.quad_params.tau_m, self.quad_params.weight,
+                        self.quad_params.inv_inertia, self.quad_params.inertia, self.quad_params.rotor_geometry, 
+                        self.quad_params.k_eta, self.quad_params.drag_matrix, self.quad_params.rotor_drag_matrix,
+                        self.quad_params.k_flap, self.quad_params.k_h, self.quad_params.rotor_geometry_hat_maps,
+                        self.quad_params.rotor_dir, self.quad_params.k_m, self.quad_params.k_w,
+                        self.quad_params.kp_att, self.quad_params.kd_att, self.quad_params.TM_to_f, torch.tensor([self.quad_params.g]))
+
 
     def reset_idx(self, env_idx, options):
         """ 
@@ -248,6 +306,8 @@ class QuadrotorEnv(VecEnv):
             self.max_roll_moment[env_idx] = self.max_thrust[env_idx] * np.abs(self.quad_params.rotor_pos[env_idx]['r1'][1])
             self.max_pitch_moment[env_idx] = self.max_thrust[env_idx] * np.abs(self.quad_params.rotor_pos[env_idx]['r1'][0])
             self.max_yaw_moment = self.quad_params.k_m[env_idx].cpu().numpy() * self.rotor_speed_max**2
+            self.pack_dynamics_args()
+
         if options["traj_randomization_fn"] is not None:
             # If a trajectory randomization function is provided, call it to randomize the trajectory.
             # Modifies the trajectory in place.
@@ -363,7 +423,13 @@ class QuadrotorEnv(VecEnv):
         self.vehicle_states['wind'] = self.wind_profile.update(self.t, self.vehicle_states['x'])
 
         # Last perform forward integration using the commanded motor speed and the current state
-        self.vehicle_states = self.quadrotors.step(self.vehicle_states, self.control_dict, self.t_step)
+        if self.trace_dynamics:
+            control_tensor = torch.cat([self.control_dict[key] for key in self.control_dict.keys()], dim=-1)
+            packed_states = BatchedMultirotor._pack_state(self.vehicle_states, self.num_envs, torch.device("cpu"))
+            self.vehicle_states = BatchedMultirotor._unpack_state(self.traced_step(packed_states, control_tensor, torch.Tensor([self.t_step]).float(), *self.dynamics_args), np.arange(self.num_envs, dtype=int), self.num_envs)
+        else:
+            self.vehicle_states = self.quadrotors.step(self.vehicle_states, self.control_dict, self.t_step)
+
         pre_termination_obs = self._get_obs()
 
         # Update t by t_step
@@ -572,9 +638,10 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
                  ax = None,                             # Axis for rendering. Optional.
                  color = None,                          # The color of the quadrotor.
                  reset_options = DEFAULT_RESET_OPTIONS,
+                 trace_dynamics = True,
                  action_history_length = 1
                  ):
-        super().__init__(num_envs, initial_states, control_mode, reward_fn, quad_params, device, max_time, wind_profile, world, sim_rate, aero, render_mode, render_fps, fig, ax, color, reset_options)
+        super().__init__(num_envs, initial_states, control_mode, reward_fn, quad_params, device, max_time, wind_profile, world, sim_rate, aero, render_mode, render_fps, fig, ax, color, reset_options, trace_dynamics)
         self.trajectory = trajectory
         self.action_history_length = action_history_length
         if self.control_mode == 'cmd_vel':
