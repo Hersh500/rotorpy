@@ -5,6 +5,7 @@ from scipy.spatial.transform import Rotation
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import warnings
+import roma
 
 from rotorpy.world import World
 from rotorpy.vehicles.multirotor import BatchedMultirotorParams, BatchedMultirotor, JITMultirotor
@@ -277,7 +278,9 @@ class QuadrotorEnv(VecEnv):
             vel = torch.rand(3, device=self.device, dtype=torch.float64) * 2 * options['vel_bound'] - options['vel_bound']
             self.vehicle_states['x'][env_idx] = pos.double()
             self.vehicle_states['v'][env_idx] = vel.double()
-            self.vehicle_states['q'][env_idx] = torch.tensor([0, 0, 0, 1], device=self.device).double()
+            random_euler = _minmax_scale(torch.rand(3, device=self.device, dtype=torch.float64), torch.tensor([-np.pi/6, -np.pi/6, -np.pi/2], device=self.device), torch.tensor([np.pi/6, np.pi/6, np.pi/2], device=self.device))
+            self.vehicle_states['q'][env_idx] = roma.euler_to_unitquat('xyz', random_euler)
+            # self.vehicle_states['q'][env_idx] = torch.tensor([0, 0, 0, 1], device=self.device).double()
             self.vehicle_states['w'][env_idx] = torch.zeros(3, device=self.device).double()
             self.vehicle_states['wind'][env_idx] = torch.zeros(3, device=self.device).double()
             self.vehicle_states['wind'][env_idx] = torch.zeros(3, device=self.device).double()

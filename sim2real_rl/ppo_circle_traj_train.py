@@ -39,7 +39,7 @@ from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback,
 
 device = torch.device("cpu")
 
-num_envs =2048 
+num_envs = 2048 
 init_rotor_speed = 1788.53
 action_history_length = 3
 
@@ -72,11 +72,12 @@ randomizations["kp_att"] = [1000, 1500]
 randomizations["kd_att"] = [40, 60]
 
 reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
-reset_options["params"] = "fixed"
+reset_options["params"] = "random"
 reset_options["randomization_ranges"] = randomizations
 reset_options["pos_bound"] = 2.0
 reset_options["vel_bound"] = 0.5
-reset_options["traj_randomization_fn"] = circle_randomization_fn 
+# reset_options["traj_randomization_fn"] = circle_randomization_fn 
+reset_options["traj_randomization_fn"] = None
 
 control_mode = "cmd_ctatt"
 quad_params["motor_noise_std"] = 0
@@ -104,6 +105,7 @@ env = QuadrotorDiffTrackingEnv(num_envs,
                               render_mode="None",
                               reward_fn=reward_fn,
                               reset_options=reset_options,
+                              trace_dynamics=True,
                                action_history_length=action_history_length)
 
 
@@ -146,6 +148,7 @@ eval_env = QuadrotorDiffTrackingEnv(num_eval_envs,
                               render_mode="3D",
                               reward_fn=reward_fn,
                               reset_options=eval_reset_options,
+                              trace_dynamics=True,
                                     action_history_length=action_history_length)
 
 wrapped_eval_env = VecMonitor(eval_env)
@@ -174,7 +177,7 @@ num_envs = 5
 init_rotor_speed = 1788.53
 
 reward_fn = lambda obs, action: vec_diff_reward_negative(obs, action, weights={'x': 1, 'v': 0.1, 'yaw': 0.0, 'w': 2e-2, 'u': 5e-3, 'u_mag': 1e-3, 'survive': 3})
-trajectory = BatchedHoverTraj(num_uavs=num_envs)
+# trajectory = BatchedHoverTraj(num_uavs=num_envs)
 
 # generate random initial conditions
 x0 = {'x': torch.rand(num_envs,3, device=device).double() * 4 - 2,

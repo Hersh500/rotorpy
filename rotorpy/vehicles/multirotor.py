@@ -1183,6 +1183,7 @@ class JITMultirotor(object):
         state_dot = {'vdot': v_dot, 'wdot': w_dot}
         return state_dot
 
+    # TODO: add observation history
     def step(self, state, control, t_step, idxs, rotor_speed_min, rotor_speed_max, num_rotors, motor_noise, mass, tau_m, weight, inv_inertia, inertia, rotor_geometry, k_eta, drag_matrix, rotor_drag_matrix, k_flap, k_h, rotor_geometry_hat_maps, rotor_dir, k_m, k_w, kp_att, kd_att, TM_to_f, g):
         """
         Integrate dynamics forward from state given constant control for time t_step.

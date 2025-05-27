@@ -45,8 +45,9 @@ reward_weights = {'x': 1.0,
                   'v': 0.1, 
                   'yaw': 0.1, 
                   'w': 2e-3, 
-                  'u': np.array([3e-3, 3e-3, 3e-3, 3e-3]), 
+                  'u': np.array([7e-3, 3e-3, 3e-3, 3e-3]), 
                   'u_mag': np.array([2e-4, 3e-4, 3e-4, 3e-4]), 
+                # 'u_mag': np.array([0, 0, 0, 0]),
                   'survive': 3}
 
 
@@ -70,7 +71,7 @@ reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIO
 reset_options["params"] = "random"
 reset_options["randomization_ranges"] = randomizations
 reset_options["pos_bound"] = 2.0 
-reset_options["vel_bound"] = 0.5
+reset_options["vel_bound"] = 1.0
 reset_options["trajectory"] = "fixed"
 
 control_mode = "cmd_ctatt"
@@ -150,7 +151,7 @@ print(f"DOING FINAL EVALUATION...")
 num_envs = 5
 init_rotor_speed = 1788.53
 
-reward_fn = lambda obs, action: vec_diff_reward_negative(obs, action, weights={'x': 1, 'v': 0.1, 'yaw': 0.0, 'w': 2e-2, 'u': 5e-3, 'u_mag': 1e-3, 'survive': 3})
+# reward_fn = lambda obs, action: vec_diff_reward_negative(obs, action, weights={'x': 1, 'v': 0.1, 'yaw': 0.0, 'w': 2e-2, 'u': 5e-3, 'u_mag': 1e-3, 'survive': 3})
 trajectory = BatchedHoverTraj(num_uavs=num_envs)
 
 # generate random initial conditions

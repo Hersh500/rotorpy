@@ -121,6 +121,7 @@ while t < 500:
     policy_action = model.predict(policy_obs, deterministic=True)[0]
     policy_control_dict = env_for_policy.rescale_action(policy_action)
     # policy_eulers = R.from_quat(policy_control_dict["cmd_q"] * np.sign(policy_control_dict["cmd_q"][:,-1].reshape(-1, 1))).as_euler('xyz')
+    
     policy_eulers = R.from_quat(policy_control_dict["cmd_q"]).as_euler('xyz')
 
     policy_obs, policy_rwd, policy_done, _ = env_for_policy.step(policy_action)
