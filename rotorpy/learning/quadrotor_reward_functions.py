@@ -162,8 +162,7 @@ def vec_diff_reward_negative(observation,
     """
     pos_history_length = kwargs.get('pos_history_length', 1)
     action_history_length = kwargs.get('action_history_length', 1)
-    action_dim = kwargs.get('action_dim', 4)
-    offset = 3 * pos_history_length
+    offset = 3 * (pos_history_length - 1)
 
     # distance reward - reward smaller pos errors
     dist_reward = -weights['x'] * np.linalg.norm(observation[...,0:3], axis=-1)
@@ -187,12 +186,12 @@ def vec_diff_reward_negative(observation,
 
     # Mean-based reward
     if isinstance(weights['u'], float):
-        action_history = observation[...,13+offset:13+offset+action_history_length*action_dim].reshape(action.shape[0], -1, action.shape[-1])
+        action_history = observation[...,13+offset:13+offset+action_history_length*action.shape[-1]].reshape(action.shape[0], -1, action.shape[-1])
         mean_action = np.mean(action_history, axis=1)
         action_reward = -weights['u']*(np.linalg.norm(action - mean_action, axis=-1))**2
     else:
         # Multiply the weight by the action difference per action-term
-        action_history = observation[...,13+offset:13+offset+action_history_length*action_dim].reshape(action.shape[0], -1, action.shape[-1])
+        action_history = observation[...,13+offset:13+offset+action_history_length*action.shape[-1]].reshape(action.shape[0], -1, action.shape[-1])
         mean_action = np.mean(action_history, axis=1)
         action_reward = np.dot((action - mean_action)**2, -weights['u'])
 

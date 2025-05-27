@@ -44,13 +44,13 @@ pos_history_length = 3
 
 reward_weights = {'x': 1.0, 
                   'v': 0.1, 
-                  'yaw': 0.1, 
+                  'yaw': 0.3, 
                   'w': 2e-3, 
                   'u': np.array([3e-3, 3e-3, 3e-3, 3e-3]), 
                   'u_mag': np.array([2e-4, 3e-4, 3e-4, 3e-4]), 
                   'survive': 3}
 
-reward_fn = lambda obs, action: vec_diff_reward_negative(obs, action, reward_weights)
+reward_fn = lambda obs, action, **kwargs: vec_diff_reward_negative(obs, action, reward_weights, **kwargs)
 
 trajectory = BatchedHoverTraj(num_uavs=num_envs)
 x0 = {'x': torch.zeros(num_envs,3, device=device).double(),

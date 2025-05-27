@@ -668,7 +668,7 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
             options["traj_randomization_fn"](self.trajectory, env_idx)
     
     def step(self, action):
-        obs, reward, done, info = super().step(action)
+        _, reward, done, info = super().step(action)
 
         # update previous action to current action
         self.prev_action[:, 1:] = self.prev_action[:, :-1]
@@ -677,7 +677,12 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
         self.prev_pos[:, 1:] = self.prev_pos[:, :-1]
         self.prev_pos[:,0] = self.vehicle_states['x'] - self.trajectory.update(torch.from_numpy(self.t))['x']
 
-        return self._get_obs(), reward, done, info
+        obs = self._get_obs()
+
+        return obs, reward, done, info
+
+    def _get_reward(self, observation, action):
+        return self.reward_fn(observation, action, pos_history_length=self.pos_history_length, action_history_length=self.action_history_length)
 
     def _get_obs(self):
         flat_output = self.trajectory.update(torch.from_numpy(self.t))
