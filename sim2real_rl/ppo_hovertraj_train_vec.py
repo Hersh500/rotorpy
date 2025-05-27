@@ -40,16 +40,15 @@ device = torch.device("cpu")
 num_envs = 1024
 init_rotor_speed = 1788.53
 action_history_length = 3
+pos_history_length = 3
 
 reward_weights = {'x': 1.0, 
                   'v': 0.1, 
                   'yaw': 0.1, 
                   'w': 2e-3, 
-                  'u': np.array([7e-3, 3e-3, 3e-3, 3e-3]), 
+                  'u': np.array([3e-3, 3e-3, 3e-3, 3e-3]), 
                   'u_mag': np.array([2e-4, 3e-4, 3e-4, 3e-4]), 
-                # 'u_mag': np.array([0, 0, 0, 0]),
                   'survive': 3}
-
 
 reward_fn = lambda obs, action: vec_diff_reward_negative(obs, action, reward_weights)
 
@@ -64,7 +63,7 @@ x0 = {'x': torch.zeros(num_envs,3, device=device).double(),
 randomizations = dict(crazyflie_randomizations)
 randomizations["mass"] = [0.026, 0.034]
 randomizations["tau_m"] = [0.004, 0.006]
-randomizations["kp_att"] = [1000, 2000]
+randomizations["kp_att"] = [1000, 1500]
 randomizations["kd_att"] = [40, 60]
 
 reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
@@ -88,7 +87,8 @@ env = QuadrotorDiffTrackingEnv(num_envs,
                               reward_fn=reward_fn,
                               reset_options=reset_options,
                               trace_dynamics=True,
-                               action_history_length=action_history_length)
+                               action_history_length=action_history_length,
+                               pos_history_length=pos_history_length)
 
 
 # Allows Stable Baselines to report accurate reward and episode lengths
@@ -124,7 +124,8 @@ eval_env = QuadrotorDiffTrackingEnv(num_eval_envs,
                               reward_fn=reward_fn,
                               reset_options=eval_reset_options,
                               trace_dynamics=True,
-                                    action_history_length=action_history_length)
+                                    action_history_length=action_history_length,
+                                    pos_history_length=pos_history_length)
 
 wrapped_eval_env = VecMonitor(eval_env)
 
@@ -151,7 +152,6 @@ print(f"DOING FINAL EVALUATION...")
 num_envs = 5
 init_rotor_speed = 1788.53
 
-# reward_fn = lambda obs, action: vec_diff_reward_negative(obs, action, weights={'x': 1, 'v': 0.1, 'yaw': 0.0, 'w': 2e-2, 'u': 5e-3, 'u_mag': 1e-3, 'survive': 3})
 trajectory = BatchedHoverTraj(num_uavs=num_envs)
 
 # generate random initial conditions
@@ -182,7 +182,8 @@ env_for_policy = QuadrotorDiffTrackingEnv(num_envs,
                               render_mode="3D",
                               reward_fn=reward_fn,
                               reset_options=reset_options,
-                                          action_history_length=action_history_length)
+                                          action_history_length=action_history_length,
+                                          pos_history_length=pos_history_length)
 
 env_for_ctrlr = QuadrotorDiffTrackingEnv(num_envs, 
                               initial_states=x0, 
@@ -194,7 +195,8 @@ env_for_ctrlr = QuadrotorDiffTrackingEnv(num_envs,
                               render_mode="None",
                               reward_fn=reward_fn,
                               reset_options=reset_options,
-                                         action_history_length=action_history_length)
+                                         action_history_length=action_history_length,
+                                         pos_history_length=pos_history_length)
 
 policy_obs = env_for_policy.reset()
 ctrlr_obs = env_for_ctrlr.reset()
@@ -212,10 +214,7 @@ ctrlr_actions = np.zeros((500, num_envs, 4))
 t = 0
 while t < 500:
     env_for_policy.render()
-    ctrlr_state = {'x': torch.from_numpy(ctrlr_obs[:, 0:3]).double(), 
-                   'v': torch.from_numpy(ctrlr_obs[:, 3:6]).double(), 
-                   'q': torch.from_numpy(ctrlr_obs[:, 6:10]).double(), 
-                   'w': torch.from_numpy(ctrlr_obs[:, 10:13]).double()}
+    ctrlr_state = env_for_ctrlr.vehicle_states
     control_dict = controller.update(0, ctrlr_state, trajectory.update(0))
 
     # rescale controller actions to [-1, 1]

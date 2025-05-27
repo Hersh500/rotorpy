@@ -515,7 +515,7 @@ class QuadrotorEnv(VecEnv):
         elif self.control_mode == "cmd_ctatt":
             cmd_thrust = _minmax_scale(action[...,0].reshape(-1, 1), self.quad_params.num_rotors * self.min_thrust, self.quad_params.num_rotors * self.max_thrust)
             control_dict["cmd_thrust"] = cmd_thrust
-            control_dict["cmd_q"] = Rotation.from_euler("xyz", _minmax_scale(action[...,1:4].reshape(-1, 3), -np.pi/3, np.pi/3)).as_quat()
+            control_dict["cmd_q"] = Rotation.from_euler("xyz", _minmax_scale(action[...,1:4].reshape(-1, 3), -np.pi/6, np.pi/6)).as_quat()
         return control_dict
 
     def _get_reward(self, observation, action):
@@ -642,21 +642,26 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
                  color = None,                          # The color of the quadrotor.
                  reset_options = DEFAULT_RESET_OPTIONS,
                  trace_dynamics = True,
-                 action_history_length = 1
+                 action_history_length = 1,
+                 pos_history_length = 1
                  ):
         super().__init__(num_envs, initial_states, control_mode, reward_fn, quad_params, device, max_time, wind_profile, world, sim_rate, aero, render_mode, render_fps, fig, ax, color, reset_options, trace_dynamics)
         self.trajectory = trajectory
         self.action_history_length = action_history_length
+        self.pos_history_length = pos_history_length
+        self.prev_pos = torch.zeros((self.num_envs, pos_history_length, 3))
         if self.control_mode == 'cmd_vel':
             self.prev_action = np.zeros((self.num_envs, action_history_length, 3))
-            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(13+3*self.action_history_length,), dtype=np.float32)
+            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(3 * self.pos_history_length + 10+ 3*self.action_history_length,), dtype=np.float32)
         else:
             self.prev_action = np.zeros((self.num_envs, action_history_length, 4))
-            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(13+4*self.action_history_length,), dtype=np.float32)
+            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(3 * self.pos_history_length + 10+ 4*self.action_history_length,), dtype=np.float32)
     
     def reset_idx(self, env_idx, options):
         super().reset_idx(env_idx, options)
         self.prev_action[env_idx] = 0
+        self.prev_pos[env_idx] = self.vehicle_states['x'][env_idx] - self.trajectory.update(torch.from_numpy(self.t))['x'][env_idx]
+
         if options["traj_randomization_fn"] is not None:
             # If a trajectory randomization function is provided, call it to randomize the trajectory.
             # Modifies the trajectory in place.
@@ -669,11 +674,14 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
         self.prev_action[:, 1:] = self.prev_action[:, :-1]
         self.prev_action[:,0] = action
 
+        self.prev_pos[:, 1:] = self.prev_pos[:, :-1]
+        self.prev_pos[:,0] = self.vehicle_states['x'] - self.trajectory.update(torch.from_numpy(self.t))['x']
+
         return self._get_obs(), reward, done, info
 
     def _get_obs(self):
         flat_output = self.trajectory.update(torch.from_numpy(self.t))
-        state_vec = torch.cat([self.vehicle_states['x'] - flat_output['x'],
+        state_vec = torch.cat([self.prev_pos.reshape(self.num_envs, -1),
                                self.vehicle_states['v'] - flat_output['x_dot'],
                                self.vehicle_states['q'],
                                self.vehicle_states['w']], dim=-1)

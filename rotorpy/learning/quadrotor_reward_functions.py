@@ -149,7 +149,10 @@ def vec_diff_reward(observation, action, weights={'x': 1, 'v': 0.1, 'yaw': 0.0, 
     return dist_reward + vel_reward + action_reward + ang_rate_reward + action_mag_reward
 
 
-def vec_diff_reward_negative(observation, action, weights={'x': 1, 'v': 0.1, 'yaw': 0.0, 'w': 1e-1, 'u': 1e-2, 'u_mag': 1e-2, 'survive':5}):
+def vec_diff_reward_negative(observation, 
+                             action, 
+                             weights={'x': 1, 'v': 0.1, 'yaw': 0.0, 'w': 1e-1, 'u': 1e-2, 'u_mag': 1e-2, 'survive':5},
+                             **kwargs):
     """
     Rewards low position error, low velocity error. 
     It is a combination of position error, velocity error, body rates, and
@@ -157,18 +160,22 @@ def vec_diff_reward_negative(observation, action, weights={'x': 1, 'v': 0.1, 'ya
 
     actions should be normalized to [-1, 1]
     """
+    pos_history_length = kwargs.get('pos_history_length', 1)
+    action_history_length = kwargs.get('action_history_length', 1)
+    action_dim = kwargs.get('action_dim', 4)
+    offset = 3 * pos_history_length
 
     # distance reward - reward smaller pos errors
     dist_reward = -weights['x'] * np.linalg.norm(observation[...,0:3], axis=-1)
 
     # velocity reward - reward smaller vel errors
-    vel_reward = -weights['v'] * np.linalg.norm(observation[...,3:6], axis=-1)
+    vel_reward = -weights['v'] * np.linalg.norm(observation[...,3+offset:6+offset], axis=-1)
 
     # Compute the angular rate reward
-    ang_rate_reward = -weights['w']*np.linalg.norm(observation[...,10:13], axis=-1)
+    ang_rate_reward = -weights['w']*np.linalg.norm(observation[...,10+offset:13+offset], axis=-1)
 
     # rewards maintaining zero yaw.
-    q = observation[...,6:10]
+    q = observation[...,6+offset:10+offset]
     yaw = R.from_quat(q).as_euler('xyz')[...,2]
     yaw_reward = -weights['yaw'] * np.abs(yaw)
 
@@ -180,12 +187,12 @@ def vec_diff_reward_negative(observation, action, weights={'x': 1, 'v': 0.1, 'ya
 
     # Mean-based reward
     if isinstance(weights['u'], float):
-        action_history = observation[...,13:].reshape(action.shape[0], -1, action.shape[-1])
+        action_history = observation[...,13+offset:13+offset+action_history_length*action_dim].reshape(action.shape[0], -1, action.shape[-1])
         mean_action = np.mean(action_history, axis=1)
         action_reward = -weights['u']*(np.linalg.norm(action - mean_action, axis=-1))**2
     else:
         # Multiply the weight by the action difference per action-term
-        action_history = observation[...,13:].reshape(action.shape[0], -1, action.shape[-1])
+        action_history = observation[...,13+offset:13+offset+action_history_length*action_dim].reshape(action.shape[0], -1, action.shape[-1])
         mean_action = np.mean(action_history, axis=1)
         action_reward = np.dot((action - mean_action)**2, -weights['u'])
 
