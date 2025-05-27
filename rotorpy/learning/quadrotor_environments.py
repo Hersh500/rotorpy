@@ -643,19 +643,21 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
                  reset_options = DEFAULT_RESET_OPTIONS,
                  trace_dynamics = True,
                  action_history_length = 1,
-                 pos_history_length = 1
+                 pos_history_length = 1,
+                 traj_lookahead_length = 0
                  ):
         super().__init__(num_envs, initial_states, control_mode, reward_fn, quad_params, device, max_time, wind_profile, world, sim_rate, aero, render_mode, render_fps, fig, ax, color, reset_options, trace_dynamics)
         self.trajectory = trajectory
         self.action_history_length = action_history_length
         self.pos_history_length = pos_history_length
         self.prev_pos = torch.zeros((self.num_envs, pos_history_length, 3))
+        self.traj_lookahead_length = traj_lookahead_length
         if self.control_mode == 'cmd_vel':
             self.prev_action = np.zeros((self.num_envs, action_history_length, 3))
-            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(3 * self.pos_history_length + 10+ 3*self.action_history_length,), dtype=np.float32)
+            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(3 * self.pos_history_length + 10+ 3*self.action_history_length + 3*self.traj_lookahead_length,), dtype=np.float32)
         else:
             self.prev_action = np.zeros((self.num_envs, action_history_length, 4))
-            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(3 * self.pos_history_length + 10+ 4*self.action_history_length,), dtype=np.float32)
+            self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(3 * self.pos_history_length + 10+ 4*self.action_history_length + 3*self.traj_lookahead_length,), dtype=np.float32)
     
     def reset_idx(self, env_idx, options):
         super().reset_idx(env_idx, options)
@@ -691,7 +693,8 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
                                self.vehicle_states['q'],
                                self.vehicle_states['w']], dim=-1)
         prev_action_flattened = self.prev_action.reshape(self.num_envs, -1)
-        return np.hstack([state_vec.float().cpu().numpy(), prev_action_flattened])
+        lookahead = torch.cat([self.trajectory.update(torch.from_numpy(self.t+self.t_step*i))['x']-self.vehicle_states['x'] for i in range(self.traj_lookahead_length)], dim=-1).numpy().reshape(self.num_envs, -1)
+        return np.hstack([state_vec.float().cpu().numpy(), prev_action_flattened, lookahead])
     
 
 def make_default_vec_env(num_envs, quad_params, control_mode, device, **kwargs):

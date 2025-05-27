@@ -39,19 +39,21 @@ from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback,
 
 device = torch.device("cpu")
 
-num_envs = 2048 
+num_envs = 512
 init_rotor_speed = 1788.53
 action_history_length = 3
+pos_history_length = 3
+lookahead_length = 5
 
 reward_weights = {'x': 1.0, 
-                  'v': 0.1, 
-                  'yaw': 0.1, 
+                  'v': 0.4, 
+                  'yaw': 0.5, 
                   'w': 0e-3, 
-                  'u': np.array([0e-3, 0e-3, 0e-3, 0e-3]), 
+                  'u': np.array([1e-3, 1e-3, 1e-3, 1e-3]), 
                   'u_mag': np.array([0e-4, 0e-4, 0e-4, 0e-4]), 
                   'survive': 5}
 
-reward_fn = lambda obs, action: vec_diff_reward_negative(obs, action, reward_weights)
+reward_fn = lambda obs, action, **kwargs: vec_diff_reward_negative(obs, action, reward_weights, **kwargs)
 
 x0 = {'x': torch.zeros(num_envs,3, device=device).double(),
         'v': torch.zeros(num_envs, 3, device=device).double(),
@@ -62,11 +64,12 @@ x0 = {'x': torch.zeros(num_envs,3, device=device).double(),
 
 def circle_randomization_fn(batched_circle_traj, idx):
     batched_circle_traj.radii[idx] = torch.rand((1,3), device=device) + 1
-    batched_circle_traj.freqs[idx] = 0.5 * torch.rand((1,3), device=device) + 0.2
+    batched_circle_traj.freqs[idx] = 0.3 * torch.rand((1,3), device=device) + 0.1
     batched_circle_traj.omegas[idx] = (2*np.pi*batched_circle_traj.freqs[idx]).to(device)
 
-randomizations = dict(crazyflie_randomizations)
-randomizations["mass"] = [0.026, 0.034]
+randomizations = {}
+randomizations["mass"] = [0.027, 0.033]
+randomizations["k_eta"] = [2.1e-8, 2.5e-8]
 randomizations["tau_m"] = [0.004, 0.006]
 randomizations["kp_att"] = [1000, 1500]
 randomizations["kd_att"] = [40, 60]
@@ -76,20 +79,17 @@ reset_options["params"] = "random"
 reset_options["randomization_ranges"] = randomizations
 reset_options["pos_bound"] = 2.0
 reset_options["vel_bound"] = 0.5
-# reset_options["traj_randomization_fn"] = circle_randomization_fn 
-reset_options["traj_randomization_fn"] = None
+reset_options["traj_randomization_fn"] = circle_randomization_fn 
 
 control_mode = "cmd_ctatt"
 quad_params["motor_noise_std"] = 0
 
 wbound = 5
 world = World.empty((-wbound, wbound, -wbound,
-                            wbound, -wbound, wbound))
+                     wbound, -wbound, wbound))
 
-radii = torch.ones((num_envs,3))
-radii[:,2] = 0
 trajectory = BatchedThreeDCircularTraj(torch.zeros((num_envs,3)),
-                                       radii,
+                                       torch.ones((num_envs, 3)),
                                        torch.ones((num_envs, 3))*0.2,
                                        torch.zeros(num_envs, dtype=bool),
                                        device=device)
@@ -98,7 +98,7 @@ env = QuadrotorDiffTrackingEnv(num_envs,
                               initial_states=x0, 
                               trajectory=trajectory,
                               quad_params=dict(quad_params), 
-                              max_time=6, 
+                              max_time=10, 
                               world=world,
                               control_mode=control_mode, 
                               device=device,
@@ -106,8 +106,9 @@ env = QuadrotorDiffTrackingEnv(num_envs,
                               reward_fn=reward_fn,
                               reset_options=reset_options,
                               trace_dynamics=True,
-                               action_history_length=action_history_length)
-
+                              action_history_length=action_history_length,
+                              pos_history_length=pos_history_length,
+                              traj_lookahead_length=lookahead_length)
 
 # Allows Stable Baselines to report accurate reward and episode lengths
 wrapped_env = VecMonitor(env)
@@ -123,7 +124,7 @@ x0_eval = {'x': torch.zeros(num_eval_envs,3, device=device).double(),
 
 
 radii = np.ones((num_eval_envs,3))
-radii[:,2] = 0
+radii[:,2] = 1
 eval_trajectory = BatchedThreeDCircularTraj(np.zeros((num_eval_envs,3)),
                                        radii,
                                        np.ones((num_eval_envs, 3))*0.2,
@@ -141,7 +142,7 @@ eval_env = QuadrotorDiffTrackingEnv(num_eval_envs,
                               initial_states=x0_eval, 
                               trajectory=eval_trajectory,
                               quad_params=dict(quad_params), 
-                              max_time=6, 
+                              max_time=10, 
                               world=world,
                               control_mode=control_mode, 
                               device=device,
@@ -149,7 +150,9 @@ eval_env = QuadrotorDiffTrackingEnv(num_eval_envs,
                               reward_fn=reward_fn,
                               reset_options=eval_reset_options,
                               trace_dynamics=True,
-                                    action_history_length=action_history_length)
+                              action_history_length=action_history_length,
+                              pos_history_length=pos_history_length,
+                              traj_lookahead_length=lookahead_length)
 
 wrapped_eval_env = VecMonitor(eval_env)
 
@@ -176,9 +179,6 @@ print(f"DOING FINAL EVALUATION...")
 num_envs = 5
 init_rotor_speed = 1788.53
 
-reward_fn = lambda obs, action: vec_diff_reward_negative(obs, action, weights={'x': 1, 'v': 0.1, 'yaw': 0.0, 'w': 2e-2, 'u': 5e-3, 'u_mag': 1e-3, 'survive': 3})
-# trajectory = BatchedHoverTraj(num_uavs=num_envs)
-
 # generate random initial conditions
 x0 = {'x': torch.rand(num_envs,3, device=device).double() * 4 - 2,
         'v': torch.rand(num_envs, 3, device=device).double() * 0.1, 
@@ -196,32 +196,35 @@ reset_options["traj_randomization_fn"] = None
 control_mode = "cmd_ctatt"
 params = BatchedMultirotorParams([quad_params] * num_envs, num_envs, device)
 
-# quad_params["tau_m"] = 0.05
 env_for_policy = QuadrotorDiffTrackingEnv(num_envs, 
                               initial_states=x0, 
                               trajectory=eval_trajectory,
                               quad_params=params, 
-                              max_time=5, 
+                              max_time=10, 
                               world=world,
                               control_mode=control_mode, 
                               device=device,
                               render_mode="3D",
                               reward_fn=reward_fn,
                               reset_options=reset_options,
-                                          action_history_length=action_history_length)
+                              action_history_length=action_history_length,
+                              pos_history_length=pos_history_length,
+                              traj_lookahead_length=lookahead_length)
 
 env_for_ctrlr = QuadrotorDiffTrackingEnv(num_envs, 
                               initial_states=x0, 
                               trajectory=eval_trajectory,
                               quad_params=params, 
-                              max_time=5, 
+                              max_time=10, 
                               world=world,
                               control_mode=control_mode, 
                               device=device,
                               render_mode="None",
                               reward_fn=reward_fn,
                               reset_options=reset_options,
-                                         action_history_length=action_history_length)
+                              action_history_length=action_history_length,
+                              pos_history_length=pos_history_length,
+                              traj_lookahead_length=lookahead_length)
 
 policy_obs = env_for_policy.reset()
 ctrlr_obs = env_for_ctrlr.reset()
@@ -230,20 +233,19 @@ terminated = [False for i in range(num_envs)]
 
 controller = BatchedSE3Control(params, num_envs, device)
 
+num_eval_steps = 1000
 policy_states = []
-policy_actions = np.zeros((500, num_envs, 4))
+policy_actions = np.zeros((num_eval_steps, num_envs, 4))
 ctrlr_states = []
-ctrlr_actions = np.zeros((500, num_envs, 4))
+ctrlr_actions = np.zeros((num_eval_steps, num_envs, 4))
+
+reference_states = []
 
 # Step and render the environment, comparing the RL agent to the SE3 controller.
 t = 0
-while t < 500:
+while t < num_eval_steps:
     env_for_policy.render()
-    ctrlr_state = {'x': torch.from_numpy(ctrlr_obs[:, 0:3]).double(), 
-                   'v': torch.from_numpy(ctrlr_obs[:, 3:6]).double(), 
-                   'q': torch.from_numpy(ctrlr_obs[:, 6:10]).double(), 
-                   'w': torch.from_numpy(ctrlr_obs[:, 10:13]).double()}
-    control_dict = controller.update(0, ctrlr_state, trajectory.update(0))
+    control_dict = controller.update(t*0.01, env_for_ctrlr.vehicle_states, eval_trajectory.update(t*0.01))
 
     # rescale controller actions to [-1, 1]
     ctrl_norm_thrust = (control_dict["cmd_thrust"].numpy() - 4 * env_for_ctrlr.min_thrust) / (4 * env_for_ctrlr.max_thrust - 4 * env_for_ctrlr.min_thrust)
@@ -252,7 +254,7 @@ while t < 500:
     eulers_norm = 2 * (eulers + np.pi) / (2 * np.pi) - 1
     ctrlr_action = np.hstack([ctrl_norm_thrust, eulers_norm])
     ctrlr_obs, ctrlr_rwd, ctrlr_done, _ = env_for_ctrlr.step(ctrlr_action)
-    ctrlr_states.append(ctrlr_obs)
+    ctrlr_states.append(env_for_ctrlr.vehicle_states['x'])
     ctrlr_actions[t] = np.hstack([control_dict["cmd_thrust"].numpy(), eulers])
 
     # Now do the policy
@@ -264,10 +266,11 @@ while t < 500:
     for i in range(num_envs):
         if policy_done[i]:
             terminated[i] = True
-    policy_states.append(policy_obs)
+    policy_states.append(env_for_policy.vehicle_states['x'])
     policy_actions[t] = np.hstack([policy_control_dict["cmd_thrust"], policy_eulers])
     t += 1
     print(t)
+    reference_states.append(eval_trajectory.update(t*0.01)['x'])
 
 env_for_policy.close()
 env_for_ctrlr.close()
@@ -293,6 +296,7 @@ for i in range(num_envs):
     for j in range(3):
         ax[j][i].plot(policy_states[:, i, j], label="policy")
         ax[j][i].plot(ctrlr_states[:, i, j], label="ctrlr")
+        ax[j][i].plot(reference_states[:, i, j], label="reference")
         ax[j][i].set_title(f"Axis {j} Env {i}")
         ax[j][i].legend()
 # state_fig.tight_layout()

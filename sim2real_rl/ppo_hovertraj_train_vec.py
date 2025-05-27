@@ -44,7 +44,7 @@ pos_history_length = 3
 
 reward_weights = {'x': 1.0, 
                   'v': 0.1, 
-                  'yaw': 0.3, 
+                  'yaw': 0.3,
                   'w': 2e-3, 
                   'u': np.array([3e-3, 3e-3, 3e-3, 3e-3]), 
                   'u_mag': np.array([2e-4, 3e-4, 3e-4, 3e-4]), 
@@ -69,12 +69,12 @@ randomizations["kd_att"] = [40, 60]
 reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
 reset_options["params"] = "random"
 reset_options["randomization_ranges"] = randomizations
-reset_options["pos_bound"] = 2.0 
+reset_options["pos_bound"] = 2.0
 reset_options["vel_bound"] = 1.0
 reset_options["trajectory"] = "fixed"
 
 control_mode = "cmd_ctatt"
-quad_params["motor_noise_std"] = 5
+quad_params["motor_noise_std"] = 0
 
 env = QuadrotorDiffTrackingEnv(num_envs, 
                               initial_states=x0, 
@@ -124,8 +124,8 @@ eval_env = QuadrotorDiffTrackingEnv(num_eval_envs,
                               reward_fn=reward_fn,
                               reset_options=eval_reset_options,
                               trace_dynamics=True,
-                                    action_history_length=action_history_length,
-                                    pos_history_length=pos_history_length)
+                              action_history_length=action_history_length,
+                              pos_history_length=pos_history_length)
 
 wrapped_eval_env = VecMonitor(eval_env)
 
@@ -182,8 +182,8 @@ env_for_policy = QuadrotorDiffTrackingEnv(num_envs,
                               render_mode="3D",
                               reward_fn=reward_fn,
                               reset_options=reset_options,
-                                          action_history_length=action_history_length,
-                                          pos_history_length=pos_history_length)
+                              action_history_length=action_history_length,
+                              pos_history_length=pos_history_length)
 
 env_for_ctrlr = QuadrotorDiffTrackingEnv(num_envs, 
                               initial_states=x0, 
@@ -195,8 +195,8 @@ env_for_ctrlr = QuadrotorDiffTrackingEnv(num_envs,
                               render_mode="None",
                               reward_fn=reward_fn,
                               reset_options=reset_options,
-                                         action_history_length=action_history_length,
-                                         pos_history_length=pos_history_length)
+                              action_history_length=action_history_length,
+                              pos_history_length=pos_history_length)
 
 policy_obs = env_for_policy.reset()
 ctrlr_obs = env_for_ctrlr.reset()
