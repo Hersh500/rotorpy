@@ -17,10 +17,9 @@ from rotorpy.trajectories.circular_traj import BatchedThreeDCircularTraj
 from rotorpy.controllers.quadrotor_control import BatchedSE3Control
 from rotorpy.world import World
 
-
 # First we'll set up some directories for saving the policy and logs.
-models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "learning", "policies")
-log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "learning", "logs")
+models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "learning", "policies")
+log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "learning", "logs")
 if not os.path.exists(models_dir):
     os.makedirs(models_dir)
 if not os.path.exists(log_dir):
@@ -187,13 +186,6 @@ x0 = {'x': torch.rand(num_envs,3, device=device).double() * 4 - 2,
         'wind': torch.zeros(num_envs, 3, device=device).double(),
         'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed], device=device).repeat(num_envs, 1).double()}
 
-reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
-reset_options["params"] = "fixed"
-reset_options["initial_states"] = x0
-reset_options["pos_bound"] = 0.5
-reset_options["vel_bound"] = 0.2
-reset_options["traj_randomization_fn"] = None
-control_mode = "cmd_ctatt"
 params = BatchedMultirotorParams([quad_params] * num_envs, num_envs, device)
 
 env_for_policy = QuadrotorDiffTrackingEnv(num_envs, 
@@ -206,7 +198,7 @@ env_for_policy = QuadrotorDiffTrackingEnv(num_envs,
                               device=device,
                               render_mode="3D",
                               reward_fn=reward_fn,
-                              reset_options=reset_options,
+                              reset_options=eval_reset_options,
                               action_history_length=action_history_length,
                               pos_history_length=pos_history_length,
                               traj_lookahead_length=lookahead_length)
@@ -221,7 +213,7 @@ env_for_ctrlr = QuadrotorDiffTrackingEnv(num_envs,
                               device=device,
                               render_mode="None",
                               reward_fn=reward_fn,
-                              reset_options=reset_options,
+                              reset_options=eval_reset_options,
                               action_history_length=action_history_length,
                               pos_history_length=pos_history_length,
                               traj_lookahead_length=lookahead_length)
@@ -245,6 +237,7 @@ reference_states = []
 t = 0
 while t < num_eval_steps:
     env_for_policy.render()
+    reference_states.append(eval_trajectory.update(t*0.01)['x'])
     control_dict = controller.update(t*0.01, env_for_ctrlr.vehicle_states, eval_trajectory.update(t*0.01))
 
     # rescale controller actions to [-1, 1]
@@ -270,13 +263,13 @@ while t < num_eval_steps:
     policy_actions[t] = np.hstack([policy_control_dict["cmd_thrust"], policy_eulers])
     t += 1
     print(t)
-    reference_states.append(eval_trajectory.update(t*0.01)['x'])
 
 env_for_policy.close()
 env_for_ctrlr.close()
 
 policy_states = np.array(policy_states)
 ctrlr_states = np.array(ctrlr_states)
+reference_states = np.array(reference_states)
 
 # Plot the results
 fig, ax = plt.subplots(4, num_envs, figsize=(10, 2))
@@ -299,5 +292,4 @@ for i in range(num_envs):
         ax[j][i].plot(reference_states[:, i, j], label="reference")
         ax[j][i].set_title(f"Axis {j} Env {i}")
         ax[j][i].legend()
-# state_fig.tight_layout()
 plt.show()
