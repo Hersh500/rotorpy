@@ -41,6 +41,7 @@ num_envs = 1024
 init_rotor_speed = 1788.53
 action_history_length = 3
 pos_history_length = 3
+lookahead_length = 0
 
 reward_weights = {'x': 1.0, 
                   'v': 0.1, 
@@ -70,7 +71,7 @@ reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIO
 reset_options["params"] = "random"
 reset_options["randomization_ranges"] = randomizations
 reset_options["pos_bound"] = 2.0
-reset_options["vel_bound"] = 1.0
+reset_options["vel_bound"] = 1.5
 reset_options["trajectory"] = "fixed"
 
 control_mode = "cmd_ctatt"
@@ -171,7 +172,6 @@ reset_options["trajectory"] = "fixed"
 control_mode = "cmd_ctatt"
 params = BatchedMultirotorParams([quad_params] * num_envs, num_envs, device)
 
-# quad_params["tau_m"] = 0.05
 env_for_policy = QuadrotorDiffTrackingEnv(num_envs, 
                               initial_states=x0, 
                               trajectory=trajectory,

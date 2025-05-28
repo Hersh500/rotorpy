@@ -693,8 +693,11 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
                                self.vehicle_states['q'],
                                self.vehicle_states['w']], dim=-1)
         prev_action_flattened = self.prev_action.reshape(self.num_envs, -1)
-        lookahead = torch.cat([self.trajectory.update(torch.from_numpy(self.t+self.t_step*i))['x']-self.vehicle_states['x'] for i in range(self.traj_lookahead_length)], dim=-1).numpy().reshape(self.num_envs, -1)
-        return np.hstack([state_vec.float().cpu().numpy(), prev_action_flattened, lookahead])
+        if self.traj_lookahead_length > 0:
+            lookahead = torch.cat([self.trajectory.update(torch.from_numpy(self.t+self.t_step*i))['x']-self.vehicle_states['x'] for i in range(self.traj_lookahead_length)], dim=-1).numpy().reshape(self.num_envs, -1)
+            return np.hstack([state_vec.float().cpu().numpy(), prev_action_flattened, lookahead])
+        else:
+            return np.hstack([state_vec.float().cpu().numpy(), prev_action_flattened])
     
 
 def make_default_vec_env(num_envs, quad_params, control_mode, device, **kwargs):
