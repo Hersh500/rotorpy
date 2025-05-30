@@ -799,7 +799,7 @@ class BatchedMultirotor(object):
 
         # Option 1 - RK45 integration
         # sol = scipy.integrate.solve_ivp(s_dot_fn, (0, t_step), s, first_step=t_step)
-        sol = odeint(s_dot_fn, s[idxs], t=torch.tensor([0.0, t_step], device=self.device), method=self.integrator)
+        sol = odeint(s_dot_fn, s[idxs], t=torch.tensor([0.0, t_step], device=self.device), method=self.integrator, options={'step_size': 2e-5})
         # s = sol['y'][:,-1]
         s = sol[-1, :]
         # Option 2 - Euler integration
@@ -897,7 +897,7 @@ class BatchedMultirotor(object):
             BatchedMultirotor.hat_map(body_rates).permute(2, 0, 1)) @ (self.params.rotor_geometry[idxs].transpose(1, 2))
 
         # Compute the thrust of each rotor, assuming that the rotors all point in the body z direction!
-        T = torch.zeros(num_drones, 3, 4, device=self.device)
+        T = torch.zeros(num_drones, 3, 4, device=self.device).double()
         T[..., -1, :] = self.params.k_eta[idxs] * rotor_speeds ** 2
 
         # Add in aero wrenches (if applicable)
@@ -908,6 +908,7 @@ class BatchedMultirotor(object):
             # Rotor drag (aka H force) acting at each propeller hub.
             tmp = self.params.rotor_drag_matrix[idxs] @ local_airspeeds.double()
             H = -rotor_speeds.unsqueeze(1) * tmp
+            # print(f"rotor drag force: {H}")
             # Pitching flapping moment acting at each propeller hub.
             M_flap = BatchedMultirotor.hat_map(local_airspeeds.transpose(1, 2).reshape(num_drones * 4, 3))
             M_flap = M_flap.permute(2, 0, 1).reshape(num_drones, 4, 3, 3).double()
@@ -919,9 +920,9 @@ class BatchedMultirotor(object):
             lift = torch.bmm(lift, (local_airspeeds[:, 0, :] ** 2 + local_airspeeds[:, 1, :] ** 2).unsqueeze(1))
             T += lift
         else:
-            D = torch.zeros(num_drones, 3, device=self.device)
-            H = torch.zeros((num_drones, 3, self.params.num_rotors), device=self.device)
-            M_flap = torch.zeros((num_drones, 3, self.params.num_rotors), device=self.device)
+            D = torch.zeros(num_drones, 3, device=self.device).double()
+            H = torch.zeros((num_drones, 3, self.params.num_rotors), device=self.device).double()
+            M_flap = torch.zeros((num_drones, 3, self.params.num_rotors), device=self.device).double()
 
         # Compute the moments due to the rotor thrusts, rotor drag (if applicable), and rotor drag torques
         M_force = -torch.einsum('bijk, bik->bj', self.params.rotor_geometry_hat_maps[idxs], T + H)
@@ -1309,9 +1310,9 @@ class JITMultirotor(object):
             lift = torch.bmm(lift, (local_airspeeds[:, 0, :] ** 2 + local_airspeeds[:, 1, :] ** 2).unsqueeze(1))
             T += lift
         else:
-            D = torch.zeros(num_drones, 3, device=self.device)
-            H = torch.zeros((num_drones, 3, num_rotors[0]), device=self.device)
-            M_flap = torch.zeros((num_drones, 3, num_rotors[0]), device=self.device)
+            D = torch.zeros(num_drones, 3, device=self.device).double()
+            H = torch.zeros((num_drones, 3, num_rotors[0]), device=self.device).double()
+            M_flap = torch.zeros((num_drones, 3, num_rotors[0]), device=self.device).double()
 
         # Compute the moments due to the rotor thrusts, rotor drag (if applicable), and rotor drag torques
         M_force = -torch.einsum('bijk, bik->bj', rotor_geometry_hat_maps[idxs], T + H)

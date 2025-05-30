@@ -439,7 +439,7 @@ class QuadrotorEnv(VecEnv):
         self.t += self.t_step
 
         # Check for safety
-        oob = self._is_out_of_bounds()
+        oob = self._is_out_of_bounds_traj()
 
         # Determine whether or not the session should terminate.
         time_done = self.t >= self.max_time
@@ -520,6 +520,10 @@ class QuadrotorEnv(VecEnv):
 
     def _get_reward(self, observation, action):
         return self.reward_fn(observation, action)
+
+    def _is_out_of_bounds_traj(self):
+        tmp = torch.any(torch.abs(self.vehicle_states['x'] - self.trajectory.update(torch.from_numpy(self.t))['x']) > 4, dim=-1)
+        return tmp.cpu().numpy()
 
     def _is_out_of_bounds(self):
         se = torch.any(torch.abs(self.vehicle_states['v']) > 100, dim=-1)
@@ -662,7 +666,7 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
     def reset_idx(self, env_idx, options):
         super().reset_idx(env_idx, options)
         self.prev_action[env_idx] = 0
-        self.prev_pos[env_idx] = self.vehicle_states['x'][env_idx] - self.trajectory.update(torch.from_numpy(self.t))['x'][env_idx]
+        self.prev_pos[env_idx] = self.vehicle_states['x'][env_idx] # - self.trajectory.update(torch.from_numpy(self.t))['x'][env_idx]
 
         if options["traj_randomization_fn"] is not None:
             # If a trajectory randomization function is provided, call it to randomize the trajectory.
@@ -676,8 +680,9 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
         self.prev_action[:, 1:] = self.prev_action[:, :-1]
         self.prev_action[:,0] = action
 
+
         self.prev_pos[:, 1:] = self.prev_pos[:, :-1]
-        self.prev_pos[:,0] = self.vehicle_states['x'] - self.trajectory.update(torch.from_numpy(self.t))['x']
+        self.prev_pos[:,0] = self.vehicle_states['x'] # - self.trajectory.update(torch.from_numpy(self.t))['x']
 
         obs = self._get_obs()
 
@@ -688,7 +693,8 @@ class QuadrotorDiffTrackingEnv(QuadrotorEnv):
 
     def _get_obs(self):
         flat_output = self.trajectory.update(torch.from_numpy(self.t))
-        state_vec = torch.cat([self.prev_pos.reshape(self.num_envs, -1),
+        state_vec = torch.cat([self.vehicle_states['x'] - flat_output['x'],
+                               (self.prev_pos[:,1:] - self.vehicle_states['x'].unsqueeze(1).numpy()).reshape(self.num_envs, -1),
                                self.vehicle_states['v'] - flat_output['x_dot'],
                                self.vehicle_states['q'],
                                self.vehicle_states['w']], dim=-1)

@@ -11,7 +11,7 @@ from stable_baselines3.common.vec_env import VecMonitor
 from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, CallbackList
 
 import rotorpy
-from rotorpy.vehicles.crazyflie_params import quad_params  # Import quad params for the quadrotor environment.
+from rotorpy.vehicles.crazyfliebrushless_params import quad_params  # Import quad params for the quadrotor environment.
 
 # Import the QuadrotorEnv gymnasium environment using the following command.
 from rotorpy.learning.quadrotor_environments import QuadrotorDiffTrackingEnv
@@ -24,9 +24,9 @@ from rotorpy.world import World
 
 
 model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "learning", "policies", "PPO",
-                         "circletraj_cmd_ctatt_May-28-15-48")
+                         "hover_bldc_cmd_ctattMay-28-17-50")
 
-model_file = "rl_model_6979584_steps"
+model_file = "hover_bldc_4079616_steps"
 
 # Load ppo policy
 model = PPO.load(os.path.join(model_dir, model_file))
@@ -35,7 +35,7 @@ num_eval_envs = 5
 control_mode = "cmd_ctatt"
 action_history_length = 3
 pos_history_length = 3
-lookahead_length = 5
+lookahead_length = 0
 
 reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
 eval_reset_options = dict(reset_options)
@@ -43,13 +43,8 @@ eval_reset_options["traj_randomization_fn"] = None
 eval_reset_options["params"] = "fixed"
 eval_reset_options["initial_state"] = "fixed"
 
-radii = np.ones((num_eval_envs,3))
-radii[:,2] = 1
-eval_trajectory = BatchedThreeDCircularTraj(np.zeros((num_eval_envs,3)),
-                                       radii,
-                                       np.ones((num_eval_envs, 3))*0.2,
-                                       np.zeros(num_eval_envs, dtype=bool),
-                                       device=device)
+
+eval_trajectory = BatchedHoverTraj(num_uavs=num_eval_envs)
 
 reward_weights = {'x': 1.0, 
                   'v': 0.4, 
@@ -74,10 +69,7 @@ wbound = 5
 world = World.empty((-wbound, wbound, -wbound,
                      wbound, -wbound, wbound))
 
-eval_params = dict(quad_params)
-eval_params['mass'] *= 0.5
-print(eval_params['k_eta'])
-params = BatchedMultirotorParams([eval_params] * num_eval_envs, num_eval_envs, device)
+params = BatchedMultirotorParams([quad_params] * num_eval_envs, num_eval_envs, device)
 
 env_for_policy = QuadrotorDiffTrackingEnv(num_eval_envs, 
                               initial_states=x0, 
@@ -87,12 +79,13 @@ env_for_policy = QuadrotorDiffTrackingEnv(num_eval_envs,
                               world=world,
                               control_mode=control_mode, 
                               device=device,
-                              render_mode="None",
+                              render_mode="3D",
                               reward_fn=reward_fn,
                               reset_options=eval_reset_options,
                               action_history_length=action_history_length,
                               pos_history_length=pos_history_length,
-                              traj_lookahead_length=lookahead_length)
+                              traj_lookahead_length=lookahead_length,
+                              trace_dynamics=False)
 
 env_for_ctrlr = QuadrotorDiffTrackingEnv(num_eval_envs, 
                               initial_states=x0, 
@@ -107,15 +100,16 @@ env_for_ctrlr = QuadrotorDiffTrackingEnv(num_eval_envs,
                               reset_options=eval_reset_options,
                               action_history_length=action_history_length,
                               pos_history_length=pos_history_length,
-                              traj_lookahead_length=lookahead_length)
+                              traj_lookahead_length=lookahead_length,
+                              trace_dynamics=False)
 
 policy_obs = env_for_policy.reset()
 ctrlr_obs = env_for_ctrlr.reset()
 
 terminated = [False for i in range(num_eval_envs)]
 
-controller = BatchedSE3Control(params, num_eval_envs, device)
-
+controller = BatchedSE3Control(params, num_eval_envs, device, kp_att=torch.tensor([quad_params["kp_att"]], device=device).repeat(num_eval_envs, 1).double(), 
+                               kd_att=torch.tensor([quad_params["kd_att"]], device=device).repeat(num_eval_envs, 1).double())
 num_eval_steps = 1000
 policy_states = []
 policy_actions = np.zeros((num_eval_steps, num_eval_envs, 4))
@@ -127,7 +121,7 @@ reference_states = []
 # Step and render the environment, comparing the RL agent to the SE3 controller.
 t = 0
 while t < num_eval_steps:
-    # env_for_policy.render()
+    env_for_policy.render()
     reference_states.append(eval_trajectory.update(t*0.01)['x'])
     control_dict = controller.update(t*0.01, env_for_ctrlr.vehicle_states, eval_trajectory.update(t*0.01))
 

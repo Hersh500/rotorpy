@@ -164,7 +164,7 @@ x0 = {'x': torch.rand(num_envs,3, device=device).double() * 4 - 2,
         'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed], device=device).repeat(num_envs, 1).double()}
 
 reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
-reset_options["params"] = "random"
+reset_options["params"] = "fixed"
 reset_options["initial_states"] = x0
 reset_options["pos_bound"] = 0.5
 reset_options["vel_bound"] = 0.2

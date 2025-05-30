@@ -165,10 +165,16 @@ def vec_diff_reward_negative(observation,
     offset = 3 * (pos_history_length - 1)
 
     # distance reward - reward smaller pos errors
-    dist_reward = -weights['x'] * np.linalg.norm(observation[...,0:3], axis=-1)
+    if isinstance(weights['x'], float):
+        dist_reward = -weights['x'] * np.linalg.norm(observation[...,0:3], axis=-1)
+    else:
+        dist_reward = np.dot(np.abs(observation[...,0:3]), -weights['x'])
 
     # velocity reward - reward smaller vel errors
-    vel_reward = -weights['v'] * np.linalg.norm(observation[...,3+offset:6+offset], axis=-1)
+    if isinstance(weights['v'], float):
+        vel_reward = -weights['v'] * np.linalg.norm(observation[...,3+offset:6+offset], axis=-1)
+    else:
+        vel_reward = np.dot(np.abs(observation[...,3+offset:6+offset]), -weights['v'])
 
     # Compute the angular rate reward
     ang_rate_reward = -weights['w']*np.linalg.norm(observation[...,10+offset:13+offset], axis=-1)

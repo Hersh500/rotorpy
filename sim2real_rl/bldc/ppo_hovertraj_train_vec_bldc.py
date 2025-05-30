@@ -14,11 +14,12 @@ from rotorpy.learning.quadrotor_reward_functions import vec_diff_reward_negative
 from rotorpy.learning.learning_utils import *
 from rotorpy.trajectories.hover_traj import BatchedHoverTraj
 from rotorpy.controllers.quadrotor_control import BatchedSE3Control
+from rotorpy.world import World
 
 
 # First we'll set up some directories for saving the policy and logs.
-models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "learning", "policies")
-log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "learning", "logs")
+models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "learning", "policies")
+log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "learning", "logs")
 if not os.path.exists(models_dir):
     os.makedirs(models_dir)
 if not os.path.exists(log_dir):
@@ -37,8 +38,8 @@ from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback,
 
 device = torch.device("cpu")
 
-num_envs = 2048
-init_rotor_speed = 1788.53
+num_envs = 1024
+init_rotor_speed = 1676.57
 action_history_length = 3
 pos_history_length = 3
 lookahead_length = 0
@@ -47,9 +48,9 @@ reward_weights = {'x': 1.0,
                   'v': 0.1, 
                   'yaw': 0.3,
                   'w': 2e-3, 
-                  'u': np.array([3e-3, 3e-3, 3e-3, 3e-3]), 
-                  'u_mag': np.array([2e-4, 3e-4, 3e-4, 3e-4]), 
-                  'survive': 3}
+                  'u': np.array([5e-2, 5e-2, 5e-2, 5e-2]), 
+                  'u_mag': np.array([6e-4, 6e-4, 6e-4, 6e-4]), 
+                  'survive': 5}
 
 reward_fn = lambda obs, action, **kwargs: vec_diff_reward_negative(obs, action, reward_weights, **kwargs)
 
@@ -61,11 +62,15 @@ x0 = {'x': torch.zeros(num_envs,3, device=device).double(),
         'wind': torch.zeros(num_envs, 3, device=device).double(),
         'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed], device=device).repeat(num_envs, 1).double()}
 
+# quad_params["kp_att"] = 1500
+# quad_params["kd_att"] = 150
+
 randomizations = dict(crazyflie_brushless_randomizations)
-randomizations["mass"] = [0.032, 0.048]
-randomizations["k_eta"] = [3.0e-8, 4.0e-8]
-randomizations["kp_att"] = [3000, 3400]
-randomizations["kd_att"] = [300, 400]
+randomizations["mass"] = [quad_params['mass']*0.8, quad_params['mass']*1.2]
+randomizations["k_eta"] = [quad_params['k_eta']*0.8, quad_params['k_eta']*1.2]
+randomizations["kp_att"] = [quad_params["kp_att"]*0.9, quad_params["kp_att"]*1.1]
+randomizations["kd_att"] = [quad_params["kd_att"]*0.9, quad_params["kd_att"]*1.1]
+randomizations["tau_m"] = [quad_params["tau_m"]*0.8, quad_params["tau_m"]*1.2]
 
 reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
 reset_options["params"] = "random"
@@ -77,11 +82,16 @@ reset_options["trajectory"] = "fixed"
 control_mode = "cmd_ctatt"
 quad_params["motor_noise_std"] = 0
 
+wbound = 10
+world = World.empty((-wbound, wbound, -wbound,
+                     wbound, -wbound, wbound))
+
 env = QuadrotorDiffTrackingEnv(num_envs, 
                               initial_states=x0, 
                               trajectory=trajectory,
                               quad_params=dict(quad_params), 
-                              max_time=6, 
+                              max_time=8, 
+                              world=world,
                               control_mode=control_mode, 
                               device=device,
                               render_mode="None",
@@ -109,8 +119,8 @@ x0_eval = {'x': torch.zeros(num_eval_envs,3, device=device).double(),
 
 eval_reset_options = dict(reset_options)
 eval_reset_options["trajectory"] = "fixed"
-eval_reset_options["params"] = "random"
-eval_reset_options["initial_state"] = "random"
+eval_reset_options["params"] = "fixed"
+eval_reset_options["initial_states"] = "random"
 eval_reset_options["pos_bound"] = 2.0
 eval_reset_options["vel_bound"] = 0.2
 
@@ -118,10 +128,11 @@ eval_env = QuadrotorDiffTrackingEnv(num_eval_envs,
                               initial_states=x0_eval, 
                               trajectory=trajectory,
                               quad_params=dict(quad_params), 
-                              max_time=6, 
+                              max_time=8, 
+                              world=world,
                               control_mode=control_mode, 
                               device=device,
-                              render_mode="None",
+                              render_mode="3D",
                               reward_fn=reward_fn,
                               reset_options=eval_reset_options,
                               trace_dynamics=True,
@@ -131,13 +142,13 @@ eval_env = QuadrotorDiffTrackingEnv(num_eval_envs,
 wrapped_eval_env = VecMonitor(eval_env)
 
 start_time = datetime.now()
-checkpoint_callback = CheckpointCallback(save_freq=max(50000//num_envs, 1), save_path=f"{models_dir}/PPO/hover_cmd_ctatt{start_time.strftime('%b-%d-%H-%M')}/",
-                                         name_prefix='hover')
+checkpoint_callback = CheckpointCallback(save_freq=max(50000//num_envs, 1), save_path=f"{models_dir}/PPO/hover_bldc_cmd_ctatt{start_time.strftime('%b-%d-%H-%M')}/",
+                                         name_prefix='hover_bldc')
 
-eval_callback = EvalCallback(wrapped_eval_env, eval_freq=1e6//num_envs, deterministic=True, render=True)
+eval_callback = EvalCallback(wrapped_eval_env, eval_freq=5e5//num_envs, deterministic=True, render=True)
 model = PPO(MlpPolicy,
             wrapped_env,
-            n_steps=32,
+            n_steps=8,
             batch_size=1024,
             verbose=1,
             device=device,
@@ -146,13 +157,14 @@ model = PPO(MlpPolicy,
 
 num_timesteps = 7e6
 model.learn(total_timesteps=num_timesteps, reset_num_timesteps=False,
-            tb_log_name="PPO-QuadHoverTrajVec_"+control_mode + " " + start_time.strftime('%b-%d-%H-%M'),
+            tb_log_name="PPO-QuadBLDCHoverTrajVec_"+control_mode + " " + start_time.strftime('%b-%d-%H-%M'),
             callback=CallbackList([checkpoint_callback, eval_callback]))
 
 print(f"DOING FINAL EVALUATION...")
 num_envs = 5
-init_rotor_speed = 1788.53
+init_rotor_speed = 1676.57
 
+eval_reset_options["initial_states"] = "deterministic"
 trajectory = BatchedHoverTraj(num_uavs=num_envs)
 
 # generate random initial conditions
@@ -163,46 +175,43 @@ x0 = {'x': torch.rand(num_envs,3, device=device).double() * 4 - 2,
         'wind': torch.zeros(num_envs, 3, device=device).double(),
         'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed], device=device).repeat(num_envs, 1).double()}
 
-reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
-reset_options["params"] = "random"
-reset_options["initial_states"] = x0
-reset_options["pos_bound"] = 0.5
-reset_options["vel_bound"] = 0.2
-reset_options["trajectory"] = "fixed"
-control_mode = "cmd_ctatt"
-params = BatchedMultirotorParams([quad_params] * num_envs, num_envs, device)
 
 env_for_policy = QuadrotorDiffTrackingEnv(num_envs, 
                               initial_states=x0, 
                               trajectory=trajectory,
-                              quad_params=params, 
+                              quad_params=dict(quad_params), 
                               max_time=5, 
+                              world=world,
                               control_mode=control_mode, 
                               device=device,
                               render_mode="3D",
                               reward_fn=reward_fn,
-                              reset_options=reset_options,
+                              reset_options=eval_reset_options,
                               action_history_length=action_history_length,
-                              pos_history_length=pos_history_length)
+                              pos_history_length=pos_history_length,
+                              trace_dynamics=True)
 
 env_for_ctrlr = QuadrotorDiffTrackingEnv(num_envs, 
                               initial_states=x0, 
                               trajectory=trajectory,
-                              quad_params=params, 
+                              quad_params=dict(quad_params), 
                               max_time=5, 
+                              world=world,
                               control_mode=control_mode, 
                               device=device,
                               render_mode="None",
                               reward_fn=reward_fn,
-                              reset_options=reset_options,
+                              reset_options=eval_reset_options,
                               action_history_length=action_history_length,
-                              pos_history_length=pos_history_length)
+                              pos_history_length=pos_history_length,
+                              trace_dynamics=True)
 
 policy_obs = env_for_policy.reset()
 ctrlr_obs = env_for_ctrlr.reset()
 
 terminated = [False for i in range(num_envs)]
 
+params = BatchedMultirotorParams([quad_params] * num_envs, num_envs, device)
 controller = BatchedSE3Control(params, num_envs, device)
 
 policy_states = []
@@ -213,7 +222,7 @@ ctrlr_actions = np.zeros((500, num_envs, 4))
 # Step and render the environment, comparing the RL agent to the SE3 controller.
 t = 0
 while t < 500:
-    env_for_policy.render()
+    env_for_ctrlr.render()
     ctrlr_state = env_for_ctrlr.vehicle_states
     control_dict = controller.update(0, ctrlr_state, trajectory.update(0))
 

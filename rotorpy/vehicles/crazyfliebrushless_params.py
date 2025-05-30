@@ -11,15 +11,19 @@ Notes:
 """
 import numpy as np
 
-d = 0.043  # Arm length
+# d = 0.043  # Arm length
+d = 0.05  # Arm length
 
 quad_params = {
 
     # Inertial properties
     'mass': 0.04,       # kg
-    'Ixx':  1.43e-5,    # kg*m^2
-    'Iyy':  1.43e-5,    # kg*m^2
-    'Izz':  2.89e-5,    # kg*m^2
+    # 'Ixx':  1.43e-5,    # kg*m^2
+    # 'Iyy':  1.43e-5,    # kg*m^2
+    # 'Izz':  2.89e-5,    # kg*m^2
+    'Ixx': 3e-5,
+    'Iyy': 3e-5,
+    'Izz': 3.5e-5,
     'Ixy':  0.0,        # kg*m^2
     'Iyz':  0.0,        # kg*m^2 
     'Ixz':  0.0,        # kg*m^2
@@ -44,7 +48,8 @@ quad_params = {
 
     # Rotor properties
     # See "System Identification of the Crazyflie 2.0 Nano Quadrocopter", Forster 2015.
-    'k_eta': 3.49e-08,          # thrust coefficient N/(rad/s)**2
+    # 'k_eta': 3.49e-08,          # thrust coefficient N/(rad/s)**2
+    'k_eta': 4.81e-08,          # thrust coefficient N/(rad/s)**2
     'k_m':   7.8e-10,           # yaw moment coefficient Nm/(rad/s)**2
     'k_d':   20.9700e-07,       # rotor drag coefficient N/(rad*m/s**2) = kg/rad
     'k_z':   1.339e-05,         # induced inflow coefficient N/(rad*m/s**2) = kg/rad
@@ -52,7 +57,8 @@ quad_params = {
     'k_flap': 0.0,              # Flapping moment coefficient Nm/(rad*m/s**2) = kg*m/rad
 
     # Motor properties
-    'tau_m': 0.005,           # motor response time, seconds
+    # 'tau_m': 0.005,           # motor response time, seconds
+    'tau_m': 0.015,           # motor response time, seconds
     'rotor_speed_min': 0,       # rad/s
     'rotor_speed_max': 3100,    # rad/s
     'motor_noise_std': 0.0,     # rad/s
@@ -62,5 +68,7 @@ quad_params = {
     'k_v': 10,              # The *world* velocity P gain (for cmd_vel)
     'kp_att': 3264.54,      # The attitude P gain (for cmd_vel, cmd_acc, and cmd_ctatt)
     'kd_att': 361.58,       # The attitude D gain (for cmd_vel, cmd_acc, and cmd_ctatt)
+    # 'kp_att': 1500,      # The attitude P gain (for cmd_vel, cmd_acc, and cmd_ctatt)
+    # 'kd_att': 120,       # The attitude D gain (for cmd_vel, cmd_acc, and cmd_ctatt)
 
 }
