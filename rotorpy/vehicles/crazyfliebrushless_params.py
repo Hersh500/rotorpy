@@ -58,7 +58,8 @@ quad_params = {
 
     # Motor properties
     # 'tau_m': 0.005,           # motor response time, seconds
-    'tau_m': 0.015,           # motor response time, seconds
+    # 'tau_m': 0.015,           # motor response time, seconds
+    'tau_m': 0.05,           # motor response time, seconds
     'rotor_speed_min': 0,       # rad/s
     'rotor_speed_max': 3100,    # rad/s
     'motor_noise_std': 0.0,     # rad/s
@@ -66,9 +67,9 @@ quad_params = {
     # Lower level controller properties (for higher level control abstractions)
     'k_w': 5.27,            # The body rate P gain (for cmd_ctbr)
     'k_v': 10,              # The *world* velocity P gain (for cmd_vel)
-    'kp_att': 3264.54,      # The attitude P gain (for cmd_vel, cmd_acc, and cmd_ctatt)
-    'kd_att': 361.58,       # The attitude D gain (for cmd_vel, cmd_acc, and cmd_ctatt)
-    # 'kp_att': 1500,      # The attitude P gain (for cmd_vel, cmd_acc, and cmd_ctatt)
-    # 'kd_att': 120,       # The attitude D gain (for cmd_vel, cmd_acc, and cmd_ctatt)
+    # 'kp_att': 3264.54,      # The attitude P gain (for cmd_vel, cmd_acc, and cmd_ctatt)
+    # 'kd_att': 361.58,       # The attitude D gain (for cmd_vel, cmd_acc, and cmd_ctatt)
+    'kp_att': 1500,      # The attitude P gain (for cmd_vel, cmd_acc, and cmd_ctatt)
+    'kd_att': 120,       # The attitude D gain (for cmd_vel, cmd_acc, and cmd_ctatt)
 
 }
