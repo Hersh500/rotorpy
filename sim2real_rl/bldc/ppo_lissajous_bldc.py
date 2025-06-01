@@ -44,14 +44,14 @@ init_rotor_speed = 1676.57
 action_history_length = 3
 pos_history_length = 3
 lookahead_length = 5
-aero = True 
+aero = True
 
-reward_weights = {'x': np.array([1.0, 1.0, 1.3]), 
+reward_weights = {'x': np.array([1.0, 1.0, 1.0]), 
                   'v': 0.3, 
                   'yaw': 0.5,
-                  'w': 2e-3, 
-                  'u': np.array([5e-2, 5e-2, 5e-2, 5e-2]), 
-                  'u_mag': np.array([0e-4, 0e-4, 0e-4, 0e-4]), 
+                  'w': 2e-1, 
+                  'u': np.array([2e-1, 1e-1, 1e-1, 1e-1]), 
+                  'u_mag': np.array([5e-4, 5e-4, 5e-4, 5e-4]), 
                   'survive': 5}
 
 reward_fn = lambda obs, action, **kwargs: vec_diff_reward_negative(obs, action, reward_weights, **kwargs)

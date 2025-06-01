@@ -32,8 +32,12 @@ from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback,
 device = torch.device("cpu")
 
 model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "learning", "policies", "PPO",
-                         "lissajous_bldc_cmd_ctattMay-29-18-40")
+                         "lissajous_bldc_cmd_ctatt_May-31-11-11")
 model_file = "liss_bldc_5996544_steps"
+
+# model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "learning", "policies", "PPO",
+#                          "lissajous_bldc_cmd_ctattMay-29-18-40")
+# model_file = "liss_bldc_5996544_steps"
 
 # model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "learning", "policies", "PPO",
 #                          "lissajous_bldc_cmd_ctatt_noaero_May-29-20-02")
@@ -73,9 +77,11 @@ eval_reset_options["vel_bound"] = 0.2
 eval_reset_options["traj_randomization_fn"] = None
 
 A_s = torch.ones(num_eval_envs, device=device) * 1
-B_s = torch.ones(num_eval_envs, device=device) * 4
-a_s = torch.ones(num_eval_envs, device=device) * 2.0
-b_s = torch.ones(num_eval_envs, device=device) * 0.8
+B_s = torch.ones(num_eval_envs, device=device) * 3
+# a_s = torch.ones(num_eval_envs, device=device) * 2.0
+# b_s = torch.ones(num_eval_envs, device=device) * 0.8
+a_s = torch.ones(num_eval_envs, device=device) * 0.1
+b_s = torch.ones(num_eval_envs, device=device) * 0.1
 delta_s = torch.zeros(num_eval_envs, device=device)
 x_offset_s = torch.zeros(num_eval_envs, device=device)
 y_offset_s = torch.zeros(num_eval_envs, device=device)
@@ -95,13 +101,21 @@ init_rotor_speed = 1676.57
 #         'wind': torch.zeros(num_eval_envs, 3, device=device).double(),
 #         'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed], device=device).repeat(num_eval_envs, 1).double()}
 
-x0 = {'x': torch.ones(num_eval_envs,3, device=device).double(),
+# x0 = {'x': torch.ones(num_eval_envs,3, device=device).double(),
+#         'v': torch.zeros(num_eval_envs, 3, device=device).double(),
+#         'q': torch.tensor([0, 0, 0, 1], device=device).repeat(num_eval_envs, 1).double(),
+#         'w': torch.zeros(num_eval_envs, 3, device=device).double(),
+#         'wind': torch.zeros(num_eval_envs, 3, device=device).double(),
+#         'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed], device=device).repeat(num_eval_envs, 1).double()}
+
+x0 = {'x': torch.zeros(num_eval_envs,3, device=device).double(),
         'v': torch.zeros(num_eval_envs, 3, device=device).double(),
         'q': torch.tensor([0, 0, 0, 1], device=device).repeat(num_eval_envs, 1).double(),
         'w': torch.zeros(num_eval_envs, 3, device=device).double(),
         'wind': torch.zeros(num_eval_envs, 3, device=device).double(),
         'rotor_speeds': torch.tensor([init_rotor_speed, init_rotor_speed, init_rotor_speed, init_rotor_speed], device=device).repeat(num_eval_envs, 1).double()}
 
+quad_params["tau_m"] = 0.015
 
 env_for_policy = QuadrotorDiffTrackingEnv(num_eval_envs, 
                               initial_states=x0, 
@@ -143,7 +157,8 @@ ctrlr_obs = env_for_ctrlr.reset()
 terminated = [False for i in range(num_eval_envs)]
 
 params = BatchedMultirotorParams([quad_params] * num_eval_envs, num_eval_envs, device)
-controller = BatchedSE3Control(params, num_eval_envs, device)
+controller = BatchedSE3Control(params, num_eval_envs, device,kp_att=torch.tensor([quad_params["kp_att"]], device=device).repeat(num_eval_envs, 1).double(), 
+                               kd_att=torch.tensor([quad_params["kd_att"]], device=device).repeat(num_eval_envs, 1).double())
 
 policy_states = []
 policy_actions = np.zeros((500, num_eval_envs, 4))
@@ -159,6 +174,7 @@ while t < 500:
     reference_states.append(eval_trajectory.update(t*0.01)['x'])
     # print(eval_trajectory.update(t*0.01)['x_dot'])
     control_dict = controller.update(0, ctrlr_state, eval_trajectory.update(t*0.01))
+    print(f"ctrlr motor speeds {ctrlr_state['rotor_speeds']}")
 
     # rescale controller actions to [-1, 1]
     ctrl_norm_thrust = (control_dict["cmd_thrust"].numpy() - 4 * env_for_ctrlr.min_thrust) / (4 * env_for_ctrlr.max_thrust - 4 * env_for_ctrlr.min_thrust)
@@ -180,6 +196,7 @@ while t < 500:
         if policy_done[i]:
             terminated[i] = True
     policy_states.append(env_for_policy.vehicle_states['x'])
+    print(f"policymotor speeds {env_for_policy.vehicle_states['rotor_speeds']}")
     policy_actions[t] = np.hstack([policy_control_dict["cmd_thrust"], policy_eulers])
     t += 1
     print(t)
