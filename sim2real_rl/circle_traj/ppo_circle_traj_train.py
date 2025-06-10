@@ -36,6 +36,7 @@ from stable_baselines3.ppo.policies import MlpPolicy                # The policy
 from stable_baselines3.common.vec_env import VecMonitor
 from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, CallbackList
 
+# torch.set_num_threads(1)
 device = torch.device("cpu")
 
 num_envs = 1024
@@ -74,7 +75,7 @@ randomizations["kp_att"] = [quad_params["kp_att"]*0.8, quad_params["kp_att"]*1.2
 randomizations["kd_att"] = [quad_params["kd_att"]*0.8, quad_params["kd_att"]*1.2]
 
 reset_options = dict(rotorpy.learning.quadrotor_environments.DEFAULT_RESET_OPTIONS)
-reset_options["params"] = "fixed"
+reset_options["params"] = "random"
 reset_options["randomization_ranges"] = randomizations
 reset_options["pos_bound"] = 2.0
 reset_options["vel_bound"] = 0.5
@@ -167,7 +168,9 @@ model = PPO(MlpPolicy,
             verbose=1,
             device=device,
             tensorboard_log=log_dir,
-            policy_kwargs=dict(optimizer_kwargs=dict(weight_decay=0.00001)))
+            policy_kwargs=dict(optimizer_kwargs=dict(weight_decay=0.00001),
+                               net_arch=dict(pi=[256, 256], vf=[256, 256]))
+            )
 
 num_timesteps = 7e6
 model.learn(total_timesteps=num_timesteps, reset_num_timesteps=False,

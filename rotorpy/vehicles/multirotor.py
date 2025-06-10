@@ -534,7 +534,7 @@ class BatchedMultirotorParams:
         assert len(multirotor_params_list) == num_drones
         self.num_drones = num_drones
         self.device = device
-        self.mass = torch.tensor([multirotor_params['mass'] for multirotor_params in multirotor_params_list]).unsqueeze(-1).to(device) # kg
+        self.mass = torch.tensor([multirotor_params['mass'] for multirotor_params in multirotor_params_list]).unsqueeze(-1).double().to(device) # kg
 
         self.num_rotors = multirotor_params_list[0]["num_rotors"]
         for multirotor_params in multirotor_params_list:
@@ -595,8 +595,8 @@ class BatchedMultirotorParams:
         # Low-Level Control Gains
         self.k_w = torch.tensor([multirotor_params.get('k_w', 1) for multirotor_params in multirotor_params_list]).unsqueeze(-1).to(device)  # The body rate P gain (for cmd_ctbr)
         self.k_v = torch.tensor([multirotor_params.get('k_v', 10) for multirotor_params in multirotor_params_list]).unsqueeze(-1).to(device)  # The body rate P gain (for cmd_ctbr)
-        self.kp_att = torch.tensor([multirotor_params.get('kp_att', 3000.0) for multirotor_params in multirotor_params_list]).unsqueeze(-1).to(device)
-        self.kd_att = torch.tensor([multirotor_params.get('kd_att', 360.0) for multirotor_params in multirotor_params_list]).unsqueeze(-1).to(device)
+        self.kp_att = torch.tensor([multirotor_params.get('kp_att', 3000.0) for multirotor_params in multirotor_params_list]).unsqueeze(-1).to(device).double()
+        self.kd_att = torch.tensor([multirotor_params.get('kd_att', 360.0) for multirotor_params in multirotor_params_list]).unsqueeze(-1).to(device).double()
 
     # Update methods that require some additional computations.
     # These are useful for dynamically updating the parameters of this object, for example for domain randomization.
@@ -605,7 +605,7 @@ class BatchedMultirotorParams:
         Update the mass and weight of the drone at index idx.
         """
         self.mass[idx] = mass
-        self.weight[idx,-1] = -mass * self.g
+        self.weight[idx,-1] = -self.mass[idx].squeeze(-1) * self.g
 
     def update_thrust_and_rotor_params(self, idx, k_eta = None, k_m = None, rotor_pos = None):
         """
@@ -799,7 +799,8 @@ class BatchedMultirotor(object):
 
         # Option 1 - RK45 integration
         # sol = scipy.integrate.solve_ivp(s_dot_fn, (0, t_step), s, first_step=t_step)
-        sol = odeint(s_dot_fn, s[idxs], t=torch.tensor([0.0, t_step], device=self.device), method=self.integrator, options={'step_size': 2e-5})
+        # sol = odeint(s_dot_fn, s[idxs], t=torch.tensor([0.0, t_step], device=self.device), method=self.integrator, options={'step_size': 2e-5})
+        sol = odeint(s_dot_fn, s[idxs], t=torch.tensor([0.0, t_step], device=self.device), method=self.integrator)
         # s = sol['y'][:,-1]
         s = sol[-1, :]
         # Option 2 - Euler integration
@@ -1204,6 +1205,7 @@ class JITMultirotor(object):
         s = JITMultirotor._pack_state(state, self.num_drones, self.device)
 
         # Option 1 - RK45 integration
+        # sol = odeint(s_dot_fn, s[idxs], t=torch.tensor([0.0, t_step], device=self.device), method=self.integrator, options={'step_size': 1e-3})
         sol = odeint(s_dot_fn, s[idxs], t=torch.tensor([0.0, t_step], device=self.device), method=self.integrator)
         s = sol[-1, :]
 

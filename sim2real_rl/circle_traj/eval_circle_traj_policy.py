@@ -24,7 +24,7 @@ from rotorpy.world import World
 
 
 model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "learning", "policies", "PPO",
-                         "circletraj_cmd_ctatt_May-28-15-48")
+                         "circletraj_cmd_ctatt_Jun-09-18-05")
 
 model_file = "rl_model_6979584_steps"
 
@@ -92,7 +92,8 @@ env_for_policy = QuadrotorDiffTrackingEnv(num_eval_envs,
                               reset_options=eval_reset_options,
                               action_history_length=action_history_length,
                               pos_history_length=pos_history_length,
-                              traj_lookahead_length=lookahead_length)
+                              traj_lookahead_length=lookahead_length,
+                                          trace_dynamics=False)
 
 env_for_ctrlr = QuadrotorDiffTrackingEnv(num_eval_envs, 
                               initial_states=x0, 
@@ -107,7 +108,8 @@ env_for_ctrlr = QuadrotorDiffTrackingEnv(num_eval_envs,
                               reset_options=eval_reset_options,
                               action_history_length=action_history_length,
                               pos_history_length=pos_history_length,
-                              traj_lookahead_length=lookahead_length)
+                              traj_lookahead_length=lookahead_length,
+                                         trace_dynamics=False)
 
 policy_obs = env_for_policy.reset()
 ctrlr_obs = env_for_ctrlr.reset()
@@ -116,7 +118,7 @@ terminated = [False for i in range(num_eval_envs)]
 
 controller = BatchedSE3Control(params, num_eval_envs, device)
 
-num_eval_steps = 1000
+num_eval_steps = 400
 policy_states = []
 policy_actions = np.zeros((num_eval_steps, num_eval_envs, 4))
 ctrlr_states = []
@@ -128,7 +130,7 @@ reference_states = []
 t = 0
 while t < num_eval_steps:
     # env_for_policy.render()
-    reference_states.append(eval_trajectory.update(t*0.01)['x'])
+    reference_states.append(eval_trajectory.update(t*0.01)['x'].detach().cpu().numpy())
     control_dict = controller.update(t*0.01, env_for_ctrlr.vehicle_states, eval_trajectory.update(t*0.01))
 
     # rescale controller actions to [-1, 1]
@@ -138,7 +140,7 @@ while t < num_eval_steps:
     eulers_norm = 2 * (eulers + np.pi) / (2 * np.pi) - 1
     ctrlr_action = np.hstack([ctrl_norm_thrust, eulers_norm])
     ctrlr_obs, ctrlr_rwd, ctrlr_done, _ = env_for_ctrlr.step(ctrlr_action)
-    ctrlr_states.append(env_for_ctrlr.vehicle_states['x'])
+    ctrlr_states.append(env_for_ctrlr.vehicle_states['x'].detach().cpu().numpy())
     ctrlr_actions[t] = np.hstack([control_dict["cmd_thrust"].numpy(), eulers])
 
     # Now do the policy
@@ -150,7 +152,7 @@ while t < num_eval_steps:
     for i in range(num_eval_envs):
         if policy_done[i]:
             terminated[i] = True
-    policy_states.append(env_for_policy.vehicle_states['x'])
+    policy_states.append(env_for_policy.vehicle_states['x'].detach().cpu().numpy())
     policy_actions[t] = np.hstack([policy_control_dict["cmd_thrust"], policy_eulers])
     t += 1
     print(t)
